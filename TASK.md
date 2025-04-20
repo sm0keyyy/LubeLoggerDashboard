@@ -134,3 +134,4 @@
   - Add request throttling based on rate limit information
   - Implement circuit breaker pattern for API outages
   - Add retry logic with exponential backoff for transient failures
+- [x] Created .gitignore file with appropriate patterns for C# WPF project
