@@ -453,62 +453,59 @@ namespace LubeLoggerDashboard.Services.Sync
                 OnSyncStatusChanged("All", SyncOperation.Upload, SyncStatus.Skipped, "Device is offline");
                 return new SyncResult();
             }
-    
-        #region Private Helper Methods
-
-        private async Task<SyncResult> UploadPendingChangesForEntityAsync<T>() where T : BaseEntity
-        {
-            var result = new SyncResult();
-            var entityName = typeof(T).Name;
             
             try
             {
-                OnSyncStatusChanged(entityName, SyncOperation.Upload, SyncStatus.Started);
+                var result = new SyncResult();
                 
-                // Get all entities that need to be synchronized
-                var pendingEntities = await _cacheService.GetPendingSyncItemsAsync<T>();
+                OnSyncStatusChanged("All", SyncOperation.Upload, SyncStatus.Started);
                 
-                if (!pendingEntities.Any())
-                {
-                    _logger.LogInformation($"No pending changes for {entityName}");
-                    OnSyncStatusChanged(entityName, SyncOperation.Upload, SyncStatus.Skipped, "No pending changes");
-                    return result;
-                }
+                // Upload each entity type in priority order
+                var vehicleResult = await UploadPendingChangesForEntityAsync<Vehicle>();
+                result.Merge(vehicleResult);
                 
-                _logger.LogInformation($"Uploading {pendingEntities.Count()} pending changes for {entityName}");
+                var odometerResult = await UploadPendingChangesForEntityAsync<OdometerRecord>();
+                result.Merge(odometerResult);
                 
-                foreach (var entity in pendingEntities)
-                {
-                    if (_syncCancellationTokenSource.Token.IsCancellationRequested)
-                    {
-                        _logger.LogInformation($"Upload cancelled for {entityName}");
-                        break;
-                    }
-                    
-                    try
-                    {
-                        await UploadEntityToServerAsync(entity);
-                        result.AddSuccess(entityName, entity.Id);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, $"Error uploading {entityName} with ID {entity.Id}");
-                        result.AddFailure(entityName, entity.Id, ex);
-                    }
-                }
+                var reminderResult = await UploadPendingChangesForEntityAsync<Reminder>();
+                result.Merge(reminderResult);
                 
-                OnSyncStatusChanged(entityName, SyncOperation.Upload,
+                var planResult = await UploadPendingChangesForEntityAsync<PlanRecord>();
+                result.Merge(planResult);
+                
+                var serviceResult = await UploadPendingChangesForEntityAsync<ServiceRecord>();
+                result.Merge(serviceResult);
+                
+                var repairResult = await UploadPendingChangesForEntityAsync<RepairRecord>();
+                result.Merge(repairResult);
+                
+                var upgradeResult = await UploadPendingChangesForEntityAsync<UpgradeRecord>();
+                result.Merge(upgradeResult);
+                
+                var gasResult = await UploadPendingChangesForEntityAsync<GasRecord>();
+                result.Merge(gasResult);
+                
+                var taxResult = await UploadPendingChangesForEntityAsync<TaxRecord>();
+                result.Merge(taxResult);
+                
+                var prefResult = await UploadPendingChangesForEntityAsync<UserPreference>();
+                result.Merge(prefResult);
+                
+                OnSyncStatusChanged("All", SyncOperation.Upload,
                     result.Status == SyncResultStatus.Success ? SyncStatus.Completed : SyncStatus.Failed);
                 
                 return result;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error during upload of pending changes for {entityName}");
-                OnSyncStatusChanged(entityName, SyncOperation.Upload, SyncStatus.Failed, ex.Message);
-                return result;
+                _logger.LogError(ex, "Error during upload of pending changes");
+                OnSyncStatusChanged("All", SyncOperation.Upload, SyncStatus.Failed, ex.Message);
+                return new SyncResult();
             }
         }
+        
+        #region Private Helper Methods
+
 
         private async Task<SyncResult> UploadEntityToServerAsync<T>(T entity) where T : BaseEntity
         {
@@ -829,54 +826,60 @@ namespace LubeLoggerDashboard.Services.Sync
             SyncStatusChanged?.Invoke(this, new SyncStatusChangedEventArgs(entityType, operation, status, message));
         }
 
-        #endregion
-
+        private async Task<SyncResult> UploadPendingChangesForEntityAsync<T>() where T : BaseEntity
+        {
+            var result = new SyncResult();
+            var entityName = typeof(T).Name;
+            
             try
             {
-                var result = new SyncResult();
+                OnSyncStatusChanged(entityName, SyncOperation.Upload, SyncStatus.Started);
                 
-                OnSyncStatusChanged("All", SyncOperation.Upload, SyncStatus.Started);
+                // Get all entities that need to be synchronized
+                var pendingEntities = await _cacheService.GetPendingSyncItemsAsync<T>();
                 
-                // Upload each entity type in priority order
-                var vehicleResult = await UploadPendingChangesForEntityAsync<Vehicle>();
-                result.Merge(vehicleResult);
+                if (!pendingEntities.Any())
+                {
+                    _logger.LogInformation($"No pending changes for {entityName}");
+                    OnSyncStatusChanged(entityName, SyncOperation.Upload, SyncStatus.Skipped, "No pending changes");
+                    return result;
+                }
                 
-                var odometerResult = await UploadPendingChangesForEntityAsync<OdometerRecord>();
-                result.Merge(odometerResult);
+                _logger.LogInformation($"Uploading {pendingEntities.Count()} pending changes for {entityName}");
                 
-                var reminderResult = await UploadPendingChangesForEntityAsync<Reminder>();
-                result.Merge(reminderResult);
+                foreach (var entity in pendingEntities)
+                {
+                    if (_syncCancellationTokenSource.Token.IsCancellationRequested)
+                    {
+                        _logger.LogInformation($"Upload cancelled for {entityName}");
+                        break;
+                    }
+                    
+                    try
+                    {
+                        await UploadEntityToServerAsync(entity);
+                        result.AddSuccess(entityName, entity.Id);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Error uploading {entityName} with ID {entity.Id}");
+                        result.AddFailure(entityName, entity.Id, ex);
+                    }
+                }
                 
-                var planResult = await UploadPendingChangesForEntityAsync<PlanRecord>();
-                result.Merge(planResult);
-                
-                var serviceResult = await UploadPendingChangesForEntityAsync<ServiceRecord>();
-                result.Merge(serviceResult);
-                
-                var repairResult = await UploadPendingChangesForEntityAsync<RepairRecord>();
-                result.Merge(repairResult);
-                
-                var upgradeResult = await UploadPendingChangesForEntityAsync<UpgradeRecord>();
-                result.Merge(upgradeResult);
-                
-                var gasResult = await UploadPendingChangesForEntityAsync<GasRecord>();
-                result.Merge(gasResult);
-                
-                var taxResult = await UploadPendingChangesForEntityAsync<TaxRecord>();
-                result.Merge(taxResult);
-                
-                var prefResult = await UploadPendingChangesForEntityAsync<UserPreference>();
-                result.Merge(prefResult);
-                
-                OnSyncStatusChanged("All", SyncOperation.Upload,
+                OnSyncStatusChanged(entityName, SyncOperation.Upload,
                     result.Status == SyncResultStatus.Success ? SyncStatus.Completed : SyncStatus.Failed);
                 
                 return result;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during upload of pending changes");
-                OnSyncStatusChanged("All", SyncOperation.Upload, SyncStatus.Failed, ex.Message);
-                return new SyncResult();
+                _logger.LogError(ex, $"Error during upload of pending changes for {entityName}");
+                OnSyncStatusChanged(entityName, SyncOperation.Upload, SyncStatus.Failed, ex.Message);
+                return result;
             }
         }
+        
+        #endregion
+    }
+}
