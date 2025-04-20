@@ -7,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Serilog;
+using LubeLoggerDashboard.Services.Logging;
 
 namespace LubeLoggerDashboard.Services.Api
 {
@@ -17,6 +17,7 @@ namespace LubeLoggerDashboard.Services.Api
     public class ApiClient : IApiClient
     {
         private readonly HttpClient _httpClient;
+        private readonly ILoggingService _logger;
         private string _baseUrl = "https://demo.lubelogger.com"; // Default to demo instance
         private string _apiVersion = "v1"; // Default API version
         private readonly SemaphoreSlim _throttleSemaphore = new SemaphoreSlim(1, 1);
@@ -56,8 +57,11 @@ namespace LubeLoggerDashboard.Services.Api
         /// <summary>
         /// Initializes a new instance of the ApiClient class
         /// </summary>
-        public ApiClient()
+        /// <param name="logger">The logging service</param>
+        public ApiClient(ILoggingService logger)
         {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            
             _httpClient = new HttpClient();
             _httpClient.BaseAddress = new Uri(_baseUrl);
             _httpClient.DefaultRequestHeaders.Accept.Clear();
@@ -66,14 +70,28 @@ namespace LubeLoggerDashboard.Services.Api
             // Set default options
             _options = new ApiClientOptions();
             _httpClient.Timeout = TimeSpan.FromSeconds(_options.TimeoutSeconds);
+            
+            _logger.Debug("ApiClient initialized with default settings");
         }
         
         /// <summary>
         /// Initializes a new instance of the ApiClient class with the specified options
         /// </summary>
+        /// <param name="logger">The logging service</param>
         /// <param name="options">The API client options</param>
-        public ApiClient(ApiClientOptions options) : this()
+        public ApiClient(ILoggingService logger, ApiClientOptions options)
         {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            
+            _httpClient = new HttpClient();
+            _httpClient.BaseAddress = new Uri(_baseUrl);
+            _httpClient.DefaultRequestHeaders.Accept.Clear();
+            _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            
+            // Set default options
+            _options = new ApiClientOptions();
+            _httpClient.Timeout = TimeSpan.FromSeconds(_options.TimeoutSeconds);
+            
             Configure(options);
         }
 
@@ -105,7 +123,7 @@ namespace LubeLoggerDashboard.Services.Api
                 TimeSpan.FromMinutes(options.CircuitBreakerResetTimeoutMinutes)
             );
             
-            Log.Information("API client configured with BaseUrl: {BaseUrl}, ApiVersion: {ApiVersion}, Timeout: {Timeout}s",
+            _logger.Information("API client configured with BaseUrl: {BaseUrl}, ApiVersion: {ApiVersion}, Timeout: {Timeout}s",
                 _baseUrl, _apiVersion, options.TimeoutSeconds);
         }
 
@@ -118,7 +136,7 @@ namespace LubeLoggerDashboard.Services.Api
             }
             
             _apiVersion = version;
-            Log.Information("API version set to {ApiVersion}", version);
+            _logger.Information("API version set to {ApiVersion}", version);
         }
 
         /// <inheritdoc/>
@@ -131,7 +149,7 @@ namespace LubeLoggerDashboard.Services.Api
             
             _baseUrl = baseUrl;
             _httpClient.BaseAddress = new Uri(baseUrl);
-            Log.Information("Base URL set to {BaseUrl}", baseUrl);
+            _logger.Information("Base URL set to {BaseUrl}", baseUrl);
         }
 
         /// <inheritdoc/>
@@ -141,14 +159,14 @@ namespace LubeLoggerDashboard.Services.Api
                 authHeader.StartsWith("Basic ") ? "Basic" : "Bearer",
                 authHeader.StartsWith("Basic ") ? authHeader.Substring(6) : authHeader);
             
-            Log.Debug("Authentication header set");
+            _logger.Debug("Authentication header set");
         }
 
         /// <inheritdoc/>
         public void ClearAuthenticationHeader()
         {
             _httpClient.DefaultRequestHeaders.Authorization = null;
-            Log.Debug("Authentication header cleared");
+            _logger.Debug("Authentication header cleared");
         }
 
         /// <inheritdoc/>
@@ -157,7 +175,7 @@ namespace LubeLoggerDashboard.Services.Api
             return await SendRequestWithRateLimitHandlingAsync(() =>
             {
                 var versionedEndpoint = GetVersionedEndpoint(endpoint);
-                Log.Debug("Sending GET request to {Endpoint}", versionedEndpoint);
+                _logger.Debug("Sending GET request to {Endpoint}", versionedEndpoint);
                 return _httpClient.GetAsync(versionedEndpoint);
             });
         }
@@ -171,7 +189,7 @@ namespace LubeLoggerDashboard.Services.Api
                 var versionedEndpoint = GetVersionedEndpoint(endpoint);
                 var url = $"{versionedEndpoint}{queryString}";
                 
-                Log.Debug("Sending GET request to {Url}", url);
+                _logger.Debug("Sending GET request to {Url}", url);
                 return _httpClient.GetAsync(url);
             });
         }
@@ -184,7 +202,7 @@ namespace LubeLoggerDashboard.Services.Api
                 var content = new FormUrlEncodedContent(formData.Select(p => new KeyValuePair<string, string>(p.key, p.value)));
                 var versionedEndpoint = GetVersionedEndpoint(endpoint);
                 
-                Log.Debug("Sending POST request to {Endpoint}", versionedEndpoint);
+                _logger.Debug("Sending POST request to {Endpoint}", versionedEndpoint);
                 return _httpClient.PostAsync(versionedEndpoint, content);
             });
         }
@@ -197,7 +215,7 @@ namespace LubeLoggerDashboard.Services.Api
                 var content = new FormUrlEncodedContent(formData.Select(p => new KeyValuePair<string, string>(p.key, p.value)));
                 var versionedEndpoint = GetVersionedEndpoint(endpoint);
                 
-                Log.Debug("Sending PUT request to {Endpoint}", versionedEndpoint);
+                _logger.Debug("Sending PUT request to {Endpoint}", versionedEndpoint);
                 return _httpClient.PutAsync(versionedEndpoint, content);
             });
         }
@@ -211,7 +229,7 @@ namespace LubeLoggerDashboard.Services.Api
                 var versionedEndpoint = GetVersionedEndpoint(endpoint);
                 var url = $"{versionedEndpoint}{queryString}";
                 
-                Log.Debug("Sending DELETE request to {Url}", url);
+                _logger.Debug("Sending DELETE request to {Url}", url);
                 return _httpClient.DeleteAsync(url);
             });
         }
@@ -224,7 +242,7 @@ namespace LubeLoggerDashboard.Services.Api
                 // If circuit breaker is open, API is considered unavailable
                 if (_circuitBreaker.IsOpen && _options.EnableCircuitBreaker)
                 {
-                    Log.Warning("API availability check failed: Circuit breaker is open");
+                    _logger.Warning("API availability check failed: Circuit breaker is open");
                     return false;
                 }
                 
@@ -238,11 +256,11 @@ namespace LubeLoggerDashboard.Services.Api
                 // Log health check result
                 if (_isHealthy)
                 {
-                    Log.Information("API health check successful. Status code: {StatusCode}", response.StatusCode);
+                    _logger.Information("API health check successful. Status code: {StatusCode}", response.StatusCode);
                 }
                 else
                 {
-                    Log.Warning("API health check failed. Status code: {StatusCode}", response.StatusCode);
+                    _logger.Warning("API health check failed. Status code: {StatusCode}", response.StatusCode);
                 }
                 
                 // 401 is expected if not authenticated, but means the API is available
@@ -252,7 +270,7 @@ namespace LubeLoggerDashboard.Services.Api
             {
                 _isHealthy = false;
                 _lastHealthCheck = DateTime.UtcNow;
-                Log.Error(ex, "API availability check failed");
+                _logger.Error(ex, "API availability check failed");
                 return false;
             }
         }
@@ -261,7 +279,7 @@ namespace LubeLoggerDashboard.Services.Api
         public void ResetCircuitBreaker()
         {
             _circuitBreaker.Reset();
-            Log.Information("Circuit breaker reset");
+            _logger.Information("Circuit breaker reset");
         }
         
         /// <inheritdoc/>
@@ -274,7 +292,7 @@ namespace LubeLoggerDashboard.Services.Api
             
             try
             {
-                Log.Debug("Detecting feature: {FeatureName} using endpoint: {Endpoint}", featureName, testEndpoint);
+                _logger.Debug("Detecting feature: {FeatureName} using endpoint: {Endpoint}", featureName, testEndpoint);
                 var response = await GetAsync(testEndpoint);
                 
                 // Consider the feature supported if the response is successful or returns a 404
@@ -283,14 +301,14 @@ namespace LubeLoggerDashboard.Services.Api
                               response.StatusCode == System.Net.HttpStatusCode.NotFound;
                 
                 _detectedFeatures[featureName] = isSupported;
-                Log.Information("Feature detection result: {FeatureName} is {SupportStatus}",
+                _logger.Information("Feature detection result: {FeatureName} is {SupportStatus}",
                     featureName, isSupported ? "supported" : "not supported");
                 
                 return isSupported;
             }
             catch (Exception ex)
             {
-                Log.Warning(ex, "Feature detection failed for {FeatureName}", featureName);
+                _logger.Warning(ex, "Feature detection failed for {FeatureName}", featureName);
                 _detectedFeatures[featureName] = false;
                 return false;
             }
@@ -300,7 +318,7 @@ namespace LubeLoggerDashboard.Services.Api
         public void ClearFeatureCache()
         {
             _detectedFeatures.Clear();
-            Log.Information("Feature detection cache cleared");
+            _logger.Information("Feature detection cache cleared");
         }
         
         /// <inheritdoc/>
@@ -314,7 +332,7 @@ namespace LubeLoggerDashboard.Services.Api
                 RateLimitInfo = RateLimitStatus
             };
             
-            Log.Information("Detailed health status: IsHealthy={IsHealthy}, CircuitBreaker={CircuitBreaker}, RateLimit={RateLimit}/{TotalLimit}",
+            _logger.Information("Detailed health status: IsHealthy={IsHealthy}, CircuitBreaker={CircuitBreaker}, RateLimit={RateLimit}/{TotalLimit}",
                 status.IsHealthy, status.CircuitBreakerStatus, status.RateLimitInfo.Remaining, status.RateLimitInfo.Limit);
             
             return status;
@@ -335,7 +353,7 @@ namespace LubeLoggerDashboard.Services.Api
                 
                 if (!isValid)
                 {
-                    Log.Warning("Payload size validation failed. Size: {Size} bytes, Max allowed: {MaxSize} bytes",
+                    _logger.Warning("Payload size validation failed. Size: {Size} bytes, Max allowed: {MaxSize} bytes",
                         contentLength, maxSizeBytes);
                 }
                 
@@ -343,7 +361,7 @@ namespace LubeLoggerDashboard.Services.Api
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error validating payload size");
+                _logger.Error(ex, "Error validating payload size");
                 return false;
             }
         }
@@ -409,7 +427,7 @@ namespace LubeLoggerDashboard.Services.Api
                             // We're rate limited, calculate delay
                             var delay = _rateLimitReset - DateTime.UtcNow;
                             _isThrottled = true;
-                            Log.Warning("Rate limit reached. Waiting for {Delay} before retrying", delay);
+                            _logger.Warning("Rate limit reached. Waiting for {Delay} before retrying", delay);
                             
                             // Release semaphore during delay
                             _throttleSemaphore.Release();
@@ -433,13 +451,13 @@ namespace LubeLoggerDashboard.Services.Api
                 {
                     if (DateTime.UtcNow < _circuitBreaker.ResetTime)
                     {
-                        Log.Warning("Circuit breaker is open. API is currently unavailable.");
+                        _logger.Warning("Circuit breaker is open. API is currently unavailable.");
                         throw new CircuitBreakerOpenException("Circuit breaker is open. API is currently unavailable.");
                     }
                     
                     // Try to reset the circuit breaker
                     _circuitBreaker.HalfOpen();
-                    Log.Information("Circuit breaker is half-open. Testing API availability.");
+                    _logger.Information("Circuit breaker is half-open. Testing API availability.");
                 }
                 
                 try
@@ -461,7 +479,7 @@ namespace LubeLoggerDashboard.Services.Api
                             _circuitBreaker.Failure();
                             if (_circuitBreaker.IsOpen)
                             {
-                                Log.Warning("Circuit breaker opened due to server errors");
+                                _logger.Warning("Circuit breaker opened due to server errors");
                             }
                         }
                     }
@@ -470,13 +488,13 @@ namespace LubeLoggerDashboard.Services.Api
                     {
                         if (retryCount >= _options.MaxRetries)
                         {
-                            Log.Error("Rate limit exceeded and retry count reached");
+                            _logger.Error("Rate limit exceeded and retry count reached");
                             return response; // Return the 429 response after max retries
                         }
                         
                         retryCount++;
                         var retryAfter = GetRetryAfterDelay(response, retryCount);
-                        Log.Warning("Rate limit exceeded. Retrying after {RetryAfter}ms (Attempt {RetryCount}/{MaxRetries})",
+                        _logger.Warning("Rate limit exceeded. Retrying after {RetryAfter}ms (Attempt {RetryCount}/{MaxRetries})",
                             retryAfter, retryCount, _options.MaxRetries);
                         
                         await Task.Delay(retryAfter);
@@ -496,7 +514,7 @@ namespace LubeLoggerDashboard.Services.Api
                         _circuitBreaker.Failure();
                         if (_circuitBreaker.IsOpen)
                         {
-                            Log.Warning("Circuit breaker opened due to exceptions");
+                            _logger.Warning("Circuit breaker opened due to exceptions");
                         }
                     }
                     

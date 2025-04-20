@@ -5,6 +5,8 @@ using LubeLoggerDashboard.Services.Authentication;
 using LubeLoggerDashboard.Services.Api;
 using LubeLoggerDashboard.Helpers.Security;
 using LubeLoggerDashboard.Services.DependencyInjection;
+using LubeLoggerDashboard.Services.Logging;
+using LubeLoggerDashboard.Services.Configuration;
 using Serilog;
 
 namespace LubeLoggerDashboard
@@ -15,6 +17,7 @@ namespace LubeLoggerDashboard
     public partial class App : Application
     {
         public readonly ServiceProvider ServiceProvider;
+        private ILoggingService _logger;
 
         public App()
         {
@@ -22,11 +25,8 @@ namespace LubeLoggerDashboard
             ConfigureServices(serviceCollection);
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
-            // Configure logging
-            Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Debug()
-                .WriteTo.File("logs/lubelogger.log", rollingInterval: RollingInterval.Day)
-                .CreateLogger();
+            // Get the logging service
+            _logger = ServiceProvider.GetRequiredService<ILoggingService>();
         }
 
         private void ConfigureServices(IServiceCollection services)
@@ -41,24 +41,33 @@ namespace LubeLoggerDashboard
             
             try
             {
-                // Create logs directory if it doesn't exist
-                System.IO.Directory.CreateDirectory("logs");
-                
                 // Initialize the service locator
                 ServiceLocator.Initialize(ServiceProvider);
                 
-                Log.Information("Application starting up");
+                _logger.Information("Application starting up");
             }
             catch (Exception ex)
             {
+                // If logging service fails, fall back to static Log
                 Log.Fatal(ex, "Application failed to start");
             }
         }
 
         protected override void OnExit(ExitEventArgs e)
         {
-            Log.Information("Application shutting down");
-            Log.CloseAndFlush();
+            try
+            {
+                _logger.Information("Application shutting down");
+            }
+            catch (Exception)
+            {
+                // If logging service fails, fall back to static Log
+                Log.Information("Application shutting down");
+            }
+            finally
+            {
+                Log.CloseAndFlush();
+            }
             
             base.OnExit(e);
         }

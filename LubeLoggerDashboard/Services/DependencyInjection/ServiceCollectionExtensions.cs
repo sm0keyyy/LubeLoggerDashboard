@@ -3,7 +3,10 @@ using LubeLoggerDashboard.Helpers.Security;
 using LubeLoggerDashboard.Services.Api;
 using LubeLoggerDashboard.Services.Api.Interfaces;
 using LubeLoggerDashboard.Services.Authentication;
+using LubeLoggerDashboard.Services.Configuration;
+using LubeLoggerDashboard.Services.Logging;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 
 namespace LubeLoggerDashboard.Services.DependencyInjection
 {
@@ -24,6 +27,12 @@ namespace LubeLoggerDashboard.Services.DependencyInjection
                 throw new ArgumentNullException(nameof(services));
             }
 
+            // Register configuration services
+            services.AddSingleton<IConfigurationService, ConfigurationService>();
+
+            // Register logging services
+            services.AddLoggingServices();
+
             // Register security services
             services.AddSingleton<ICredentialManager, CredentialManager>();
 
@@ -36,8 +45,41 @@ namespace LubeLoggerDashboard.Services.DependencyInjection
 
             // Register authentication services
             services.AddSingleton<AuthenticationServiceFactory>();
-            services.AddSingleton<IAuthenticationService>(provider => 
+            services.AddSingleton<IAuthenticationService>(provider =>
                 provider.GetRequiredService<AuthenticationServiceFactory>().CreateAuthenticationService());
+
+            return services;
+        }
+
+        /// <summary>
+        /// Adds logging services to the dependency injection container
+        /// </summary>
+        /// <param name="services">The service collection</param>
+        /// <returns>The service collection</returns>
+        public static IServiceCollection AddLoggingServices(this IServiceCollection services)
+        {
+            if (services == null)
+            {
+                throw new ArgumentNullException(nameof(services));
+            }
+
+            // Get logging configuration
+            var configService = new ConfigurationService();
+            var loggingConfig = configService.GetLoggingConfiguration();
+
+            // Create Serilog logger
+            var logger = LoggerFactory.CreateLogger(
+                logLevel: loggingConfig.MinimumLevel,
+                enableConsole: loggingConfig.EnableConsole,
+                logFilePath: loggingConfig.LogFilePath,
+                rollingInterval: loggingConfig.RollingInterval,
+                retainedFileCountLimit: loggingConfig.RetainedFileCountLimit);
+
+            // Register Serilog logger
+            services.AddSingleton(logger);
+
+            // Register logging service
+            services.AddSingleton<ILoggingService, LoggingService>();
 
             return services;
         }
