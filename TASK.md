@@ -136,3 +136,5 @@
   - Add retry logic with exponential backoff for transient failures
 - [x] Created .gitignore file with appropriate patterns for C# WPF project
 - [x] Removed unnecessary .md files from repository (keeping only README.md, TASK.md, and PLANNING.md)
+- [x] Recreated API_GUIDELINES.md with comprehensive API usage documentation
+- [x] Recreated LubeLoggerDashboard/Docs/DependencyInjection.md with DI system documentation
