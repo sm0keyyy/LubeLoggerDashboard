@@ -472,6 +472,16 @@ Example data structures based on the Postman collection:
 
 ## Testing Strategy
 
+### Test Infrastructure
+- Base test classes for unit, integration, and UI tests
+- Mock factories for common dependencies
+- Test data generators
+- UI automation helpers for WPF
+- API response mocking utilities
+- Database test context setup and teardown
+- Authentication test helpers
+- Navigation test helpers
+
 ### Unit Testing
 - ViewModels and business logic
 - API client mocking
