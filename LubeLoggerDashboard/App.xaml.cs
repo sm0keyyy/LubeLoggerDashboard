@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using LubeLoggerDashboard.Services.Authentication;
 using LubeLoggerDashboard.Services.Api;
 using LubeLoggerDashboard.Helpers.Security;
+using LubeLoggerDashboard.Services.DependencyInjection;
 using Serilog;
 
 namespace LubeLoggerDashboard
@@ -30,10 +31,8 @@ namespace LubeLoggerDashboard
 
         private void ConfigureServices(IServiceCollection services)
         {
-            // Register services
-            services.AddSingleton<ICredentialManager, CredentialManager>();
-            services.AddSingleton<IAuthenticationService, BasicAuthenticationService>();
-            services.AddSingleton<IApiClient, ApiClient>();
+            // Register all application services
+            services.AddApplicationServices();
         }
 
         protected override void OnStartup(StartupEventArgs e)
@@ -44,6 +43,9 @@ namespace LubeLoggerDashboard
             {
                 // Create logs directory if it doesn't exist
                 System.IO.Directory.CreateDirectory("logs");
+                
+                // Initialize the service locator
+                ServiceLocator.Initialize(ServiceProvider);
                 
                 Log.Information("Application starting up");
             }

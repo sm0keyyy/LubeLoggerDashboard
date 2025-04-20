@@ -23,8 +23,8 @@
   - [x] Feature detection capabilities
   - [x] Health check mechanism
   - [x] Payload size validation
-- [ ] Create API service interfaces for each resource type
-- [ ] Set up dependency injection system
+- [x] Create API service interfaces for each resource type
+- [x] Set up dependency injection system
 - [ ] Implement logging infrastructure using Serilog
 - [ ] Create navigation infrastructure and main window shell
 - [ ] Implement local caching system using SQLite and EF Core
