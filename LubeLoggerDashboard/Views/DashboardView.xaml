@@ -1,0 +1,43 @@
+<UserControl x:Class="LubeLoggerDashboard.Views.DashboardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:LubeLoggerDashboard.Views"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    <Grid Background="White">
+        <StackPanel Margin="20">
+            <TextBlock Text="Dashboard" FontSize="24" Margin="0,0,0,20"/>
+            <TextBlock Text="Welcome to your LubeLogger Dashboard" FontSize="18" Margin="0,0,0,20"/>
+            <TextBlock TextWrapping="Wrap" Margin="0,0,0,20">
+                <Run Text="This is your central hub for managing your vehicle maintenance records."/>
+                <LineBreak/>
+                <LineBreak/>
+                <Run Text="From here, you can view your vehicles, maintenance records, and upcoming reminders."/>
+            </TextBlock>
+            
+            <!-- Placeholder for dashboard widgets -->
+            <Border Background="#f5f5f5" CornerRadius="5" Padding="15" Margin="0,10,0,10">
+                <StackPanel>
+                    <TextBlock Text="Recent Activity" FontWeight="Bold" Margin="0,0,0,10"/>
+                    <TextBlock Text="No recent activity to display." Foreground="#7f8c8d"/>
+                </StackPanel>
+            </Border>
+            
+            <Border Background="#f5f5f5" CornerRadius="5" Padding="15" Margin="0,10,0,10">
+                <StackPanel>
+                    <TextBlock Text="Upcoming Maintenance" FontWeight="Bold" Margin="0,0,0,10"/>
+                    <TextBlock Text="No upcoming maintenance scheduled." Foreground="#7f8c8d"/>
+                </StackPanel>
+            </Border>
+            
+            <Border Background="#f5f5f5" CornerRadius="5" Padding="15" Margin="0,10,0,10">
+                <StackPanel>
+                    <TextBlock Text="Vehicle Summary" FontWeight="Bold" Margin="0,0,0,10"/>
+                    <TextBlock Text="No vehicles to display." Foreground="#7f8c8d"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Grid>
+</UserControl>

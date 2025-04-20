@@ -1,0 +1,24 @@
+<UserControl x:Class="LubeLoggerDashboard.Views.VehiclesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:LubeLoggerDashboard.Views"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    <Grid Background="White">
+        <StackPanel Margin="20">
+            <TextBlock Text="Vehicles" FontSize="24" Margin="0,0,0,20"/>
+            <TextBlock Text="Manage your vehicles" FontSize="18" Margin="0,0,0,20"/>
+            
+            <!-- Placeholder for vehicle list -->
+            <Border Background="#f5f5f5" CornerRadius="5" Padding="15" Margin="0,10,0,10">
+                <StackPanel>
+                    <TextBlock Text="Your Vehicles" FontWeight="Bold" Margin="0,0,0,10"/>
+                    <TextBlock Text="No vehicles to display." Foreground="#7f8c8d"/>
+                    <Button Content="Add Vehicle" Margin="0,10,0,0" Padding="10,5" Background="#3498db" Foreground="White"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Grid>
+</UserControl>

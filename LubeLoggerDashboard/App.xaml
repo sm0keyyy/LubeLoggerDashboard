@@ -2,8 +2,12 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:LubeLoggerDashboard"
-             StartupUri="Views/MainWindow.xaml">
+             xmlns:converters="clr-namespace:LubeLoggerDashboard.Converters">
     <Application.Resources>
-         
+        <!-- Value Converters -->
+        <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
+        <converters:BooleanToBackgroundConverter x:Key="BooleanToBackgroundConverter"/>
+        <converters:BooleanToForegroundConverter x:Key="BooleanToForegroundConverter"/>
     </Application.Resources>
 </Application>

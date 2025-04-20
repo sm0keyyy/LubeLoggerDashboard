@@ -26,9 +26,14 @@
 - [x] Create API service interfaces for each resource type
 - [x] Set up dependency injection system
 - [x] Implement logging infrastructure using Serilog
-- [ ] Create navigation infrastructure and main window shell
+- [x] Create navigation infrastructure and main window shell
+  - [x] Implement the NavigationService class
+  - [x] Implement the ViewFactory class
+  - [x] Create unit tests for NavigationService and ViewFactory
+  - [x] Update MainWindow to include navigation frame
+  - [x] Create ShellViewModel
 - [ ] Implement local caching system using SQLite and EF Core
-- [ ] Create base ViewModel classes and common utilities
+- [x] Create base ViewModel classes and common utilities
 
 ## Phase 2: Vehicle Management
 

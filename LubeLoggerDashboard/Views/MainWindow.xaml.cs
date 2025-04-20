@@ -1,8 +1,11 @@
 using System;
 using System.Windows;
+using System.Windows.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using LubeLoggerDashboard.Services.Authentication;
 using LubeLoggerDashboard.Helpers.Security;
+using LubeLoggerDashboard.Services.Navigation;
+using LubeLoggerDashboard.ViewModels;
 using Serilog;
 
 namespace LubeLoggerDashboard.Views
@@ -12,85 +15,83 @@ namespace LubeLoggerDashboard.Views
     /// </summary>
     public partial class MainWindow : Window
     {
-        private readonly IAuthenticationService _authService;
-        private readonly ICredentialManager _credentialManager;
+        private readonly IServiceProvider _serviceProvider;
+        private readonly INavigationService _navigationService;
+        private readonly ShellViewModel _viewModel;
 
         public MainWindow()
         {
             InitializeComponent();
 
             // Get services from DI container
-            var serviceProvider = ((App)Application.Current).ServiceProvider;
-            _authService = serviceProvider.GetRequiredService<IAuthenticationService>();
-            _credentialManager = serviceProvider.GetRequiredService<ICredentialManager>();
-
-            // Try to load saved credentials
-            TryLoadSavedCredentials();
+            _serviceProvider = ((App)Application.Current).ServiceProvider;
+            
+            // Register the content frame with the navigation service
+            var viewFactory = _serviceProvider.GetRequiredService<IViewFactory>();
+            _navigationService = new NavigationService(
+                viewFactory,
+                ContentFrame,
+                _serviceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<NavigationService>>());
+            
+            // Register the navigation service with the DI container
+            ((App)Application.Current).RegisterNavigationService(_navigationService);
+            
+            // Create the view model
+            _viewModel = new ShellViewModel(
+                _serviceProvider.GetRequiredService<IAuthenticationService>(),
+                _serviceProvider.GetRequiredService<ICredentialManager>(),
+                _navigationService);
+            
+            // Set the data context
+            DataContext = _viewModel;
+            
+            // Handle password changes
+            PasswordBox.PasswordChanged += PasswordBox_PasswordChanged;
+            
+            // Load the welcome view
+            _navigationService.NavigateTo("WelcomeView");
         }
 
-        private void TryLoadSavedCredentials()
+        /// <summary>
+        /// Handles the PasswordChanged event of the PasswordBox control
+        /// </summary>
+        private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            if (_viewModel != null)
+            {
+                // Update the password in the view model
+                _viewModel.Password = PasswordBox.Password;
+            }
+        }
+
+        /// <summary>
+        /// Handles the Loaded event of the Window
+        /// </summary>
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             try
             {
-                var credentials = _credentialManager.GetCredentials();
-                if (credentials != null)
+                // Check if already authenticated
+                if (_viewModel.IsLoggedIn)
                 {
-                    UsernameTextBox.Text = credentials.Username;
-                    // We don't set the password in the UI for security reasons
-                    // but we could indicate that a password is saved
-                    LoginStatusText.Text = "Saved credentials found. Enter password to login.";
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Failed to load saved credentials");
-                LoginStatusText.Text = "Could not load saved credentials.";
-            }
-        }
-
-        private async void LoginButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                LoginButton.IsEnabled = false;
-                LoginStatusText.Text = "Logging in...";
-
-                string username = UsernameTextBox.Text;
-                string password = PasswordBox.Password;
-
-                if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
-                {
-                    LoginStatusText.Text = "Username and password are required.";
-                    return;
-                }
-
-                var result = await _authService.AuthenticateAsync(username, password);
-
-                if (result.Success)
-                {
-                    // Save credentials securely
-                    _credentialManager.SaveCredentials(username, password);
-                    
-                    LoginStatusText.Text = "Login successful!";
-                    
-                    // In a real application, we would navigate to the main dashboard
-                    // or enable the navigation menu items
-                    MessageBox.Show("Login successful! The full application would now load the dashboard.", 
-                        "Authentication Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                    // Navigate to the dashboard
+                    _navigationService.NavigateTo("DashboardView");
                 }
                 else
                 {
-                    LoginStatusText.Text = $"Login failed: {result.ErrorMessage}";
+                    // Try to load saved credentials
+                    var credentials = _serviceProvider.GetRequiredService<ICredentialManager>().GetCredentials();
+                    if (credentials != null)
+                    {
+                        _viewModel.Username = credentials.Username;
+                        _viewModel.LoginStatusMessage = "Saved credentials found. Enter password to login.";
+                    }
                 }
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Login attempt failed");
-                LoginStatusText.Text = $"An error occurred: {ex.Message}";
-            }
-            finally
-            {
-                LoginButton.IsEnabled = true;
+                Log.Error(ex, "Error during window load");
+                _viewModel.LoginStatusMessage = "Error loading application.";
             }
         }
     }
