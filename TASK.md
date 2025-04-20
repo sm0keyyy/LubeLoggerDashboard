@@ -16,7 +16,10 @@
 
 ## Phase 1: Core Framework
 
-- [ ] Implement API client base framework
+- [ ] Implement API client base framework with:
+  - [x] API stability and versioning policies
+  - [x] Rate limit handling
+  - [x] Circuit breaker pattern for fault tolerance
 - [ ] Create API service interfaces for each resource type
 - [ ] Set up dependency injection system
 - [ ] Implement logging infrastructure using Serilog
@@ -118,3 +121,13 @@
   - Documents: /api/documents/upload
   - Reminders: /api/vehicle/reminders
   - System: /api/makebackup, /api/cleanup
+- [x] API stability and versioning policies:
+  - No explicit versioning in URL or headers observed
+  - Implement version parameter in client for future-proofing
+  - Use feature detection rather than version checking
+  - Add abstraction layer to isolate API changes
+- [x] Rate limits and other constraints:
+  - Implement monitoring for rate limit headers (X-RateLimit-*)
+  - Add request throttling based on rate limit information
+  - Implement circuit breaker pattern for API outages
+  - Add retry logic with exponential backoff for transient failures

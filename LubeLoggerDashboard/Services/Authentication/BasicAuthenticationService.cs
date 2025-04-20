@@ -43,6 +43,13 @@ namespace LubeLoggerDashboard.Services.Authentication
                 // Set the credentials for the API client
                 _apiClient.SetAuthenticationHeader(GetBasicAuthHeader(username, password));
 
+                // Check if API is available
+                if (!await _apiClient.IsApiAvailableAsync())
+                {
+                    Log.Warning("Authentication failed: API is not available");
+                    return AuthenticationResult.Failed("API is not available. Please try again later.");
+                }
+
                 // Test the credentials by making a request to the whoami endpoint
                 var response = await _apiClient.GetAsync("/api/whoami");
                 
@@ -61,17 +68,36 @@ namespace LubeLoggerDashboard.Services.Authentication
                     Log.Warning("Authentication failed for user {Username}: Invalid credentials", username);
                     return AuthenticationResult.Failed("Invalid username or password");
                 }
+                else if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                {
+                    // Handle rate limiting
+                    var rateLimitInfo = _apiClient.RateLimitStatus;
+                    var retryAfter = rateLimitInfo.ResetTime - DateTime.UtcNow;
+                    
+                    Log.Warning("Authentication failed for user {Username}: Rate limit exceeded", username);
+                    return AuthenticationResult.Failed($"Rate limit exceeded. Please try again after {retryAfter.TotalMinutes:0.0} minutes.");
+                }
                 else
                 {
-                    Log.Warning("Authentication failed for user {Username}: {StatusCode} - {ReasonPhrase}", 
+                    Log.Warning("Authentication failed for user {Username}: {StatusCode} - {ReasonPhrase}",
                         username, response.StatusCode, response.ReasonPhrase);
                     return AuthenticationResult.Failed($"Server returned {response.StatusCode}: {response.ReasonPhrase}");
                 }
+            }
+            catch (CircuitBreakerOpenException ex)
+            {
+                Log.Error(ex, "Authentication failed due to circuit breaker open");
+                return AuthenticationResult.Failed("API is currently unavailable due to repeated failures. Please try again later.");
             }
             catch (HttpRequestException ex)
             {
                 Log.Error(ex, "Authentication failed due to HTTP request error");
                 return AuthenticationResult.Failed($"Connection error: {ex.Message}");
+            }
+            catch (TaskCanceledException ex)
+            {
+                Log.Error(ex, "Authentication failed due to request timeout");
+                return AuthenticationResult.Failed("Request timed out. Please check your network connection and try again.");
             }
             catch (Exception ex)
             {

@@ -19,8 +19,8 @@ Before proceeding with full development, we must investigate and confirm:
 - ✅ API documentation and available endpoints (Documented via Postman collection)
 - ✅ Authentication method (Basic Auth with username/password)
 - ✅ Data formats and structures (Form data for POST/PUT, JSON responses)
-- [ ] API stability and versioning policies
-- [ ] Rate limits and other constraints
+- ✅ API stability and versioning policies
+- ✅ Rate limits and other constraints
 
 ## Architecture
 

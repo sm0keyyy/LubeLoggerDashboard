@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Threading;
 using System.Threading.Tasks;
 using Serilog;
 
@@ -14,7 +15,32 @@ namespace LubeLoggerDashboard.Services.Api
     public class ApiClient : IApiClient
     {
         private readonly HttpClient _httpClient;
-        private const string BaseUrl = "https://demo.lubelogger.com"; // Default to demo instance
+        private string _baseUrl = "https://demo.lubelogger.com"; // Default to demo instance
+        private string _apiVersion = "v1"; // Default API version
+        private readonly SemaphoreSlim _throttleSemaphore = new SemaphoreSlim(1, 1);
+        private ApiClientOptions _options;
+        private CircuitBreakerState _circuitBreaker = new CircuitBreakerState();
+        
+        // Rate limit tracking
+        private int _rateLimitLimit = int.MaxValue;
+        private int _rateLimitRemaining = int.MaxValue;
+        private DateTime _rateLimitReset = DateTime.MaxValue;
+        private bool _isThrottled = false;
+
+        /// <inheritdoc/>
+        public string ApiVersion => _apiVersion;
+
+        /// <inheritdoc/>
+        public string BaseUrl => _baseUrl;
+
+        /// <inheritdoc/>
+        public RateLimitInfo RateLimitStatus => new RateLimitInfo
+        {
+            Limit = _rateLimitLimit,
+            Remaining = _rateLimitRemaining,
+            ResetTime = _rateLimitReset,
+            IsThrottled = _isThrottled
+        };
 
         /// <summary>
         /// Initializes a new instance of the ApiClient class
@@ -22,108 +48,193 @@ namespace LubeLoggerDashboard.Services.Api
         public ApiClient()
         {
             _httpClient = new HttpClient();
-            _httpClient.BaseAddress = new Uri(BaseUrl);
+            _httpClient.BaseAddress = new Uri(_baseUrl);
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            
+            // Set default options
+            _options = new ApiClientOptions();
+            _httpClient.Timeout = TimeSpan.FromSeconds(_options.TimeoutSeconds);
+        }
+        
+        /// <summary>
+        /// Initializes a new instance of the ApiClient class with the specified options
+        /// </summary>
+        /// <param name="options">The API client options</param>
+        public ApiClient(ApiClientOptions options) : this()
+        {
+            Configure(options);
+        }
+
+        /// <inheritdoc/>
+        public void Configure(ApiClientOptions options)
+        {
+            if (options == null)
+            {
+                throw new ArgumentNullException(nameof(options));
+            }
+            
+            _options = options;
+            
+            if (!string.IsNullOrWhiteSpace(options.BaseUrl))
+            {
+                SetBaseUrl(options.BaseUrl);
+            }
+            
+            if (!string.IsNullOrWhiteSpace(options.ApiVersion))
+            {
+                SetApiVersion(options.ApiVersion);
+            }
+            
+            _httpClient.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            
+            // Configure circuit breaker
+            _circuitBreaker = new CircuitBreakerState(
+                options.CircuitBreakerFailureThreshold,
+                TimeSpan.FromMinutes(options.CircuitBreakerResetTimeoutMinutes)
+            );
+            
+            Log.Information("API client configured with BaseUrl: {BaseUrl}, ApiVersion: {ApiVersion}, Timeout: {Timeout}s",
+                _baseUrl, _apiVersion, options.TimeoutSeconds);
+        }
+
+        /// <inheritdoc/>
+        public void SetApiVersion(string version)
+        {
+            if (string.IsNullOrWhiteSpace(version))
+            {
+                throw new ArgumentException("API version cannot be null or empty", nameof(version));
+            }
+            
+            _apiVersion = version;
+            Log.Information("API version set to {ApiVersion}", version);
+        }
+
+        /// <inheritdoc/>
+        public void SetBaseUrl(string baseUrl)
+        {
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                throw new ArgumentException("Base URL cannot be null or empty", nameof(baseUrl));
+            }
+            
+            _baseUrl = baseUrl;
+            _httpClient.BaseAddress = new Uri(baseUrl);
+            Log.Information("Base URL set to {BaseUrl}", baseUrl);
         }
 
         /// <inheritdoc/>
         public void SetAuthenticationHeader(string authHeader)
         {
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
-                authHeader.StartsWith("Basic ") ? "Basic" : "Bearer", 
+                authHeader.StartsWith("Basic ") ? "Basic" : "Bearer",
                 authHeader.StartsWith("Basic ") ? authHeader.Substring(6) : authHeader);
+            
+            Log.Debug("Authentication header set");
         }
 
         /// <inheritdoc/>
         public void ClearAuthenticationHeader()
         {
             _httpClient.DefaultRequestHeaders.Authorization = null;
+            Log.Debug("Authentication header cleared");
         }
 
         /// <inheritdoc/>
         public async Task<HttpResponseMessage> GetAsync(string endpoint)
         {
-            try
+            return await SendRequestWithRateLimitHandlingAsync(() =>
             {
-                Log.Debug("Sending GET request to {Endpoint}", endpoint);
-                return await _httpClient.GetAsync(endpoint);
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Error sending GET request to {Endpoint}", endpoint);
-                throw;
-            }
+                var versionedEndpoint = GetVersionedEndpoint(endpoint);
+                Log.Debug("Sending GET request to {Endpoint}", versionedEndpoint);
+                return _httpClient.GetAsync(versionedEndpoint);
+            });
         }
 
         /// <inheritdoc/>
         public async Task<HttpResponseMessage> GetAsync(string endpoint, params (string key, string value)[] queryParams)
         {
-            try
+            return await SendRequestWithRateLimitHandlingAsync(() =>
             {
                 var queryString = BuildQueryString(queryParams);
-                var url = $"{endpoint}{queryString}";
+                var versionedEndpoint = GetVersionedEndpoint(endpoint);
+                var url = $"{versionedEndpoint}{queryString}";
                 
                 Log.Debug("Sending GET request to {Url}", url);
-                return await _httpClient.GetAsync(url);
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Error sending GET request to {Endpoint} with query parameters", endpoint);
-                throw;
-            }
+                return _httpClient.GetAsync(url);
+            });
         }
 
         /// <inheritdoc/>
         public async Task<HttpResponseMessage> PostFormAsync(string endpoint, params (string key, string value)[] formData)
         {
-            try
+            return await SendRequestWithRateLimitHandlingAsync(() =>
             {
                 var content = new FormUrlEncodedContent(formData.Select(p => new KeyValuePair<string, string>(p.key, p.value)));
+                var versionedEndpoint = GetVersionedEndpoint(endpoint);
                 
-                Log.Debug("Sending POST request to {Endpoint}", endpoint);
-                return await _httpClient.PostAsync(endpoint, content);
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Error sending POST request to {Endpoint}", endpoint);
-                throw;
-            }
+                Log.Debug("Sending POST request to {Endpoint}", versionedEndpoint);
+                return _httpClient.PostAsync(versionedEndpoint, content);
+            });
         }
 
         /// <inheritdoc/>
         public async Task<HttpResponseMessage> PutFormAsync(string endpoint, params (string key, string value)[] formData)
         {
-            try
+            return await SendRequestWithRateLimitHandlingAsync(() =>
             {
                 var content = new FormUrlEncodedContent(formData.Select(p => new KeyValuePair<string, string>(p.key, p.value)));
+                var versionedEndpoint = GetVersionedEndpoint(endpoint);
                 
-                Log.Debug("Sending PUT request to {Endpoint}", endpoint);
-                return await _httpClient.PutAsync(endpoint, content);
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Error sending PUT request to {Endpoint}", endpoint);
-                throw;
-            }
+                Log.Debug("Sending PUT request to {Endpoint}", versionedEndpoint);
+                return _httpClient.PutAsync(versionedEndpoint, content);
+            });
         }
 
         /// <inheritdoc/>
         public async Task<HttpResponseMessage> DeleteAsync(string endpoint, params (string key, string value)[] queryParams)
         {
-            try
+            return await SendRequestWithRateLimitHandlingAsync(() =>
             {
                 var queryString = BuildQueryString(queryParams);
-                var url = $"{endpoint}{queryString}";
+                var versionedEndpoint = GetVersionedEndpoint(endpoint);
+                var url = $"{versionedEndpoint}{queryString}";
                 
                 Log.Debug("Sending DELETE request to {Url}", url);
-                return await _httpClient.DeleteAsync(url);
+                return _httpClient.DeleteAsync(url);
+            });
+        }
+
+        /// <inheritdoc/>
+        public async Task<bool> IsApiAvailableAsync()
+        {
+            try
+            {
+                // If circuit breaker is open, API is considered unavailable
+                if (_circuitBreaker.IsOpen && _options.EnableCircuitBreaker)
+                {
+                    Log.Warning("API availability check failed: Circuit breaker is open");
+                    return false;
+                }
+                
+                // Try to make a simple request to check API availability
+                var response = await _httpClient.GetAsync("/api/whoami");
+                
+                // 401 is expected if not authenticated, but means the API is available
+                return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.Unauthorized;
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error sending DELETE request to {Endpoint} with query parameters", endpoint);
-                throw;
+                Log.Error(ex, "API availability check failed");
+                return false;
             }
+        }
+
+        /// <inheritdoc/>
+        public void ResetCircuitBreaker()
+        {
+            _circuitBreaker.Reset();
+            Log.Information("Circuit breaker reset");
         }
 
         /// <summary>
@@ -143,6 +254,358 @@ namespace LubeLoggerDashboard.Services.Api
                 .Select(p => $"{Uri.EscapeDataString(p.key)}={Uri.EscapeDataString(p.value)}"));
 
             return queryString;
+        }
+        
+        /// <summary>
+        /// Gets a versioned endpoint path
+        /// </summary>
+        /// <param name="endpoint">The original endpoint</param>
+        /// <returns>The versioned endpoint</returns>
+        protected virtual string GetVersionedEndpoint(string endpoint)
+        {
+            // Currently, the LubeLogger API doesn't use versioning in the URL
+            // This method is prepared for future versioning
+            
+            // If the API starts using versioning, uncomment the following:
+            // if (!endpoint.StartsWith("/"))
+            // {
+            //     endpoint = "/" + endpoint;
+            // }
+            // return $"/api/{_apiVersion}{endpoint}";
+            
+            return endpoint;
+        }
+        
+        /// <summary>
+        /// Sends a request with rate limit handling
+        /// </summary>
+        /// <param name="requestFunc">The request function</param>
+        /// <returns>The HTTP response message</returns>
+        protected virtual async Task<HttpResponseMessage> SendRequestWithRateLimitHandlingAsync(Func<Task<HttpResponseMessage>> requestFunc)
+        {
+            int retryCount = 0;
+            
+            while (true)
+            {
+                // Check if we're rate limited
+                if (_options.EnableThrottling)
+                {
+                    await _throttleSemaphore.WaitAsync();
+                    try
+                    {
+                        if (_rateLimitRemaining <= 0 && DateTime.UtcNow < _rateLimitReset)
+                        {
+                            // We're rate limited, calculate delay
+                            var delay = _rateLimitReset - DateTime.UtcNow;
+                            _isThrottled = true;
+                            Log.Warning("Rate limit reached. Waiting for {Delay} before retrying", delay);
+                            
+                            // Release semaphore during delay
+                            _throttleSemaphore.Release();
+                            await Task.Delay(delay);
+                            continue;
+                        }
+                        
+                        _isThrottled = false;
+                    }
+                    finally
+                    {
+                        if (_throttleSemaphore.CurrentCount == 0)
+                        {
+                            _throttleSemaphore.Release();
+                        }
+                    }
+                }
+                
+                // Check circuit breaker
+                if (_options.EnableCircuitBreaker && _circuitBreaker.IsOpen)
+                {
+                    if (DateTime.UtcNow < _circuitBreaker.ResetTime)
+                    {
+                        Log.Warning("Circuit breaker is open. API is currently unavailable.");
+                        throw new CircuitBreakerOpenException("Circuit breaker is open. API is currently unavailable.");
+                    }
+                    
+                    // Try to reset the circuit breaker
+                    _circuitBreaker.HalfOpen();
+                    Log.Information("Circuit breaker is half-open. Testing API availability.");
+                }
+                
+                try
+                {
+                    var response = await SendWithRetryAsync(requestFunc, retryCount);
+                    
+                    // Check for rate limit headers
+                    UpdateRateLimitInfo(response);
+                    
+                    // Update circuit breaker state
+                    if (_options.EnableCircuitBreaker)
+                    {
+                        if (response.IsSuccessStatusCode || (int)response.StatusCode < 500)
+                        {
+                            _circuitBreaker.Success();
+                        }
+                        else
+                        {
+                            _circuitBreaker.Failure();
+                            if (_circuitBreaker.IsOpen)
+                            {
+                                Log.Warning("Circuit breaker opened due to server errors");
+                            }
+                        }
+                    }
+                    
+                    if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                    {
+                        if (retryCount >= _options.MaxRetries)
+                        {
+                            Log.Error("Rate limit exceeded and retry count reached");
+                            return response; // Return the 429 response after max retries
+                        }
+                        
+                        retryCount++;
+                        var retryAfter = GetRetryAfterDelay(response, retryCount);
+                        Log.Warning("Rate limit exceeded. Retrying after {RetryAfter}ms (Attempt {RetryCount}/{MaxRetries})",
+                            retryAfter, retryCount, _options.MaxRetries);
+                        
+                        await Task.Delay(retryAfter);
+                        continue;
+                    }
+                    
+                    return response;
+                }
+                catch (CircuitBreakerOpenException)
+                {
+                    throw; // Re-throw circuit breaker exceptions
+                }
+                catch (Exception ex)
+                {
+                    if (_options.EnableCircuitBreaker)
+                    {
+                        _circuitBreaker.Failure();
+                        if (_circuitBreaker.IsOpen)
+                        {
+                            Log.Warning("Circuit breaker opened due to exceptions");
+                        }
+                    }
+                    
+                    if (retryCount >= _options.MaxRetries)
+                    {
+                        Log.Error(ex, "Error sending request after {RetryCount} retries", retryCount);
+                        throw;
+                    }
+                    
+                    retryCount++;
+                    var delay = CalculateExponentialBackoff(retryCount);
+                    Log.Warning(ex, "Error sending request. Retrying after {Delay}ms (Attempt {RetryCount}/{MaxRetries})",
+                        delay, retryCount, _options.MaxRetries);
+                    
+                    await Task.Delay(delay);
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Sends a request with retry logic
+        /// </summary>
+        /// <param name="requestFunc">The request function</param>
+        /// <param name="retryCount">The current retry count</param>
+        /// <returns>The HTTP response message</returns>
+        protected virtual async Task<HttpResponseMessage> SendWithRetryAsync(Func<Task<HttpResponseMessage>> requestFunc, int retryCount)
+        {
+            try
+            {
+                return await requestFunc();
+            }
+            catch (HttpRequestException ex) when (retryCount < _options.MaxRetries)
+            {
+                // Only retry transient errors
+                throw; // Let the outer handler deal with retries
+            }
+        }
+        
+        /// <summary>
+        /// Updates rate limit information from response headers
+        /// </summary>
+        /// <param name="response">The HTTP response message</param>
+        private void UpdateRateLimitInfo(HttpResponseMessage response)
+        {
+            if (response.Headers.TryGetValues("X-RateLimit-Limit", out var limitValues) &&
+                int.TryParse(limitValues.FirstOrDefault(), out var limit))
+            {
+                _rateLimitLimit = limit;
+            }
+            
+            if (response.Headers.TryGetValues("X-RateLimit-Remaining", out var remainingValues) &&
+                int.TryParse(remainingValues.FirstOrDefault(), out var remaining))
+            {
+                _rateLimitRemaining = remaining;
+            }
+            
+            if (response.Headers.TryGetValues("X-RateLimit-Reset", out var resetValues))
+            {
+                if (int.TryParse(resetValues.FirstOrDefault(), out var resetSeconds))
+                {
+                    _rateLimitReset = DateTime.UtcNow.AddSeconds(resetSeconds);
+                }
+                else if (DateTime.TryParse(resetValues.FirstOrDefault(), out var resetTime))
+                {
+                    _rateLimitReset = resetTime;
+                }
+            }
+            
+            Log.Debug("Rate limit info updated: Limit={Limit}, Remaining={Remaining}, Reset={Reset}",
+                _rateLimitLimit, _rateLimitRemaining, _rateLimitReset);
+        }
+        
+        /// <summary>
+        /// Gets the retry delay from the Retry-After header or calculates exponential backoff
+        /// </summary>
+        /// <param name="response">The HTTP response message</param>
+        /// <param name="retryCount">The current retry count</param>
+        /// <returns>The retry delay in milliseconds</returns>
+        private int GetRetryAfterDelay(HttpResponseMessage response, int retryCount)
+        {
+            if (response.Headers.TryGetValues("Retry-After", out var values))
+            {
+                if (int.TryParse(values.FirstOrDefault(), out var seconds))
+                {
+                    return seconds * 1000; // Convert to milliseconds
+                }
+                
+                if (DateTime.TryParse(values.FirstOrDefault(), out var retryAfterDate))
+                {
+                    var delay = retryAfterDate - DateTime.UtcNow;
+                    return (int)delay.TotalMilliseconds;
+                }
+            }
+            
+            return CalculateExponentialBackoff(retryCount);
+        }
+        
+        /// <summary>
+        /// Calculates exponential backoff with jitter
+        /// </summary>
+        /// <param name="retryCount">The current retry count</param>
+        /// <returns>The backoff delay in milliseconds</returns>
+        private int CalculateExponentialBackoff(int retryCount)
+        {
+            // Calculate exponential backoff: baseDelay * 2^retryCount
+            var backoff = _options.BaseRetryDelayMs * Math.Pow(2, Math.Min(retryCount, 6)); // Cap at 2^6 to avoid overflow
+            
+            // Add jitter (0-50% random variation) to avoid thundering herd
+            var jitter = new Random().NextDouble() * 0.5 + 0.5; // 0.5-1.0 multiplier
+            
+            return (int)(backoff * jitter);
+        }
+    }
+    
+    /// <summary>
+    /// Exception thrown when the circuit breaker is open
+    /// </summary>
+    public class CircuitBreakerOpenException : Exception
+    {
+        /// <summary>
+        /// Initializes a new instance of the CircuitBreakerOpenException class
+        /// </summary>
+        /// <param name="message">The exception message</param>
+        public CircuitBreakerOpenException(string message) : base(message) { }
+    }
+    
+    /// <summary>
+    /// Represents the state of the circuit breaker
+    /// </summary>
+    internal class CircuitBreakerState
+    {
+        private int _failureCount;
+        private readonly int _failureThreshold;
+        private readonly TimeSpan _resetTimeout;
+        private CircuitState _state = CircuitState.Closed;
+        
+        /// <summary>
+        /// Gets the time when the circuit breaker will reset
+        /// </summary>
+        public DateTime ResetTime { get; private set; }
+        
+        /// <summary>
+        /// Gets a value indicating whether the circuit breaker is open
+        /// </summary>
+        public bool IsOpen => _state == CircuitState.Open;
+        
+        /// <summary>
+        /// Initializes a new instance of the CircuitBreakerState class
+        /// </summary>
+        public CircuitBreakerState() : this(5, TimeSpan.FromMinutes(1)) { }
+        
+        /// <summary>
+        /// Initializes a new instance of the CircuitBreakerState class
+        /// </summary>
+        /// <param name="failureThreshold">The number of failures required to trip the circuit breaker</param>
+        /// <param name="resetTimeout">The timeout before the circuit breaker resets</param>
+        public CircuitBreakerState(int failureThreshold, TimeSpan resetTimeout)
+        {
+            _failureThreshold = failureThreshold;
+            _resetTimeout = resetTimeout;
+        }
+        
+        /// <summary>
+        /// Records a successful request
+        /// </summary>
+        public void Success()
+        {
+            _failureCount = 0;
+            _state = CircuitState.Closed;
+        }
+        
+        /// <summary>
+        /// Records a failed request
+        /// </summary>
+        public void Failure()
+        {
+            _failureCount++;
+            if (_failureCount >= _failureThreshold || _state == CircuitState.HalfOpen)
+            {
+                _state = CircuitState.Open;
+                ResetTime = DateTime.UtcNow.Add(_resetTimeout);
+            }
+        }
+        
+        /// <summary>
+        /// Sets the circuit breaker to half-open state
+        /// </summary>
+        public void HalfOpen()
+        {
+            _state = CircuitState.HalfOpen;
+        }
+        
+        /// <summary>
+        /// Resets the circuit breaker to closed state
+        /// </summary>
+        public void Reset()
+        {
+            _failureCount = 0;
+            _state = CircuitState.Closed;
+        }
+        
+        /// <summary>
+        /// Represents the state of the circuit
+        /// </summary>
+        private enum CircuitState
+        {
+            /// <summary>
+            /// Circuit is closed and requests are allowed
+            /// </summary>
+            Closed,
+            
+            /// <summary>
+            /// Circuit is open and requests are blocked
+            /// </summary>
+            Open,
+            
+            /// <summary>
+            /// Circuit is half-open and a single request is allowed to test the API
+            /// </summary>
+            HalfOpen
         }
     }
 }
