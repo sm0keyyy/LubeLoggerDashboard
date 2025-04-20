@@ -252,3 +252,7 @@ ASALocalRun/
 
 # JetBrains Rider
 *.sln.iml
+
+# Roo AI Assistant
+.roo/
+.roomodes
