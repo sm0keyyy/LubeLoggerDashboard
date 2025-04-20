@@ -32,10 +32,27 @@ LubeLogger Dashboard is a Windows client application that connects to and utiliz
 - **API Integration**: Connects to LubeLogger API
   - Demo instance: https://demo.lubelogger.com/api
   - Authentication: Basic Auth (username/password)
+- **Local Caching**: SQLite with Entity Framework Core
+  - Enables offline functionality
+  - Implements synchronization with the API
+- **Secure Credential Storage**: Windows DPAPI for secure credential management
 
 ## Development Status
 
-This project is currently in the planning and initial development phase. The API discovery phase has been completed, confirming that the LubeLogger API uses Basic Authentication and provides comprehensive endpoints for vehicle and maintenance record management.
+This project is currently in active development. Here's the current status:
+
+- ✅ **API Discovery Phase**: Completed - The API has been thoroughly investigated, and all necessary endpoints have been documented.
+- ✅ **Core Framework**: Completed - The MVVM architecture, API client framework, navigation infrastructure, and local caching system have been implemented.
+- 🔄 **Vehicle Management**: In Progress - Currently implementing vehicle listing, details, and editing functionality.
+- ⏳ **Record Management**: Planned - Implementation of various record types management.
+- ⏳ **Reminders & Notifications**: Planned - Implementation of maintenance reminder system.
+- ⏳ **Reports & Analytics**: Planned - Implementation of reporting and data visualization.
+- ⏳ **System Operations**: Planned - Implementation of document upload, backup creation, and system cleanup.
+
+Recent significant updates:
+- Implemented local caching system using SQLite and Entity Framework Core
+- Created entity classes, DbContext, database initializer, cache service, and sync service
+- Added support for offline operations with synchronization capabilities
 
 ## Project Documentation
 
@@ -51,6 +68,14 @@ This project is currently in the planning and initial development phase. The API
 ## Getting Started
 
 *Detailed setup and usage instructions will be added as development progresses.*
+
+### For Developers
+
+1. Clone the repository
+2. Open the solution in Visual Studio 2022 or later
+3. Restore NuGet packages
+4. Build the solution
+5. Run the application
 
 ## License
 
