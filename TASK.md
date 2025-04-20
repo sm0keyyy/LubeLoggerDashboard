@@ -4,15 +4,15 @@
 
 ## Phase 0: API Discovery & Setup
 
-- [x] Confirm LubeLogger API exists at https://lubelogger.the-freed.family/api
+- [x] Confirm LubeLogger API exists at a demo instance is available at: https://demo.lubelogger.com/api
 - [x] Verify API requires authentication (401 Unauthorized response)
 - [x] Determine specific authentication method required (Basic Auth)
 - [ ] Obtain valid API credentials for development
 - [x] Document available endpoints and response formats
-- [ ] Set up development environment with .NET 6+ and WPF
-- [ ] Create project structure following MVVM architecture
-- [ ] Implement authentication mechanism based on API requirements
-- [ ] Create secure credential storage using Windows DPAPI
+- [x] Set up development environment with .NET 6+ and WPF
+- [x] Create project structure following MVVM architecture
+- [x] Implement authentication mechanism based on API requirements
+- [x] Create secure credential storage using Windows DPAPI
 
 ## Phase 1: Core Framework
 
