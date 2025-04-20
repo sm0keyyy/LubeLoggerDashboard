@@ -25,6 +25,16 @@ namespace LubeLoggerDashboard.Services.Api
         RateLimitInfo RateLimitStatus { get; }
         
         /// <summary>
+        /// Gets a value indicating whether the API is currently healthy
+        /// </summary>
+        bool IsHealthy { get; }
+        
+        /// <summary>
+        /// Gets the time of the last health check
+        /// </summary>
+        DateTime LastHealthCheckTime { get; }
+        
+        /// <summary>
         /// Sets the API version to use for requests
         /// </summary>
         /// <param name="version">The API version</param>
@@ -102,6 +112,33 @@ namespace LubeLoggerDashboard.Services.Api
         /// </summary>
         /// <param name="options">The API client options</param>
         void Configure(ApiClientOptions options);
+        
+        /// <summary>
+        /// Detects if a specific API feature is supported
+        /// </summary>
+        /// <param name="featureName">The name of the feature to detect</param>
+        /// <param name="testEndpoint">The endpoint to test for the feature</param>
+        /// <returns>True if the feature is supported, false otherwise</returns>
+        Task<bool> DetectFeatureAsync(string featureName, string testEndpoint);
+        
+        /// <summary>
+        /// Clears the feature detection cache
+        /// </summary>
+        void ClearFeatureCache();
+        
+        /// <summary>
+        /// Gets detailed health status information about the API
+        /// </summary>
+        /// <returns>Detailed health status</returns>
+        Task<ApiHealthStatus> GetDetailedHealthStatusAsync();
+        
+        /// <summary>
+        /// Validates if the payload size is within acceptable limits
+        /// </summary>
+        /// <param name="content">The HTTP content to validate</param>
+        /// <param name="maxSizeBytes">The maximum allowed size in bytes</param>
+        /// <returns>True if the payload size is valid, false otherwise</returns>
+        bool ValidatePayloadSize(HttpContent content, long maxSizeBytes);
     }
     
     /// <summary>
@@ -179,5 +216,36 @@ namespace LubeLoggerDashboard.Services.Api
         /// The timeout in minutes before the circuit breaker resets
         /// </summary>
         public int CircuitBreakerResetTimeoutMinutes { get; set; } = 1;
+    }
+    
+    /// <summary>
+    /// Detailed health status of the API
+    /// </summary>
+    public class ApiHealthStatus
+    {
+        /// <summary>
+        /// Gets or sets a value indicating whether the API is healthy
+        /// </summary>
+        public bool IsHealthy { get; set; }
+        
+        /// <summary>
+        /// Gets or sets the time when the health status was last checked
+        /// </summary>
+        public DateTime LastChecked { get; set; }
+        
+        /// <summary>
+        /// Gets or sets the current circuit breaker status
+        /// </summary>
+        public string CircuitBreakerStatus { get; set; }
+        
+        /// <summary>
+        /// Gets or sets the current rate limit information
+        /// </summary>
+        public RateLimitInfo RateLimitInfo { get; set; }
+        
+        /// <summary>
+        /// Gets or sets additional diagnostic information
+        /// </summary>
+        public Dictionary<string, string> Diagnostics { get; set; } = new Dictionary<string, string>();
     }
 }

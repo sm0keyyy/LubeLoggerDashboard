@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
@@ -142,6 +143,100 @@ namespace LubeLoggerDashboard.Tests.Services.Api
             // Assert
             // Verify the request was made with the versioned URL
             VerifyRequest(HttpMethod.Get, "https://test.lubelogger.com/api/v1/test", Times.Once());
+        }
+        
+        [TestMethod]
+        public async Task DetectFeatureAsync_FeatureExists_ReturnsTrue()
+        {
+            // Arrange
+            SetupMockResponse(HttpStatusCode.OK, "Feature exists");
+            var apiClient = CreateApiClient();
+            
+            // Act
+            var result = await apiClient.DetectFeatureAsync("testFeature", "/api/test-feature");
+            
+            // Assert
+            Assert.IsTrue(result);
+            VerifyRequest(HttpMethod.Get, "https://test.lubelogger.com/api/test-feature", Times.Once());
+        }
+        
+        [TestMethod]
+        public async Task DetectFeatureAsync_FeatureDoesNotExist_ReturnsFalse()
+        {
+            // Arrange
+            SetupMockResponse(HttpStatusCode.NotImplemented, "Feature not implemented");
+            var apiClient = CreateApiClient();
+            
+            // Act
+            var result = await apiClient.DetectFeatureAsync("testFeature", "/api/test-feature");
+            
+            // Assert
+            Assert.IsFalse(result);
+            VerifyRequest(HttpMethod.Get, "https://test.lubelogger.com/api/test-feature", Times.Once());
+        }
+        
+        [TestMethod]
+        public async Task DetectFeatureAsync_CacheWorks_DoesNotMakeSecondRequest()
+        {
+            // Arrange
+            SetupMockResponse(HttpStatusCode.OK, "Feature exists");
+            var apiClient = CreateApiClient();
+            
+            // Act
+            var result1 = await apiClient.DetectFeatureAsync("testFeature", "/api/test-feature");
+            var result2 = await apiClient.DetectFeatureAsync("testFeature", "/api/test-feature");
+            
+            // Assert
+            Assert.IsTrue(result1);
+            Assert.IsTrue(result2);
+            VerifyRequest(HttpMethod.Get, "https://test.lubelogger.com/api/test-feature", Times.Once());
+        }
+        
+        [TestMethod]
+        public async Task GetDetailedHealthStatusAsync_ReturnsHealthStatus()
+        {
+            // Arrange
+            SetupMockResponse(HttpStatusCode.OK, "API is healthy");
+            var apiClient = CreateApiClient();
+            
+            // Act
+            var healthStatus = await apiClient.GetDetailedHealthStatusAsync();
+            
+            // Assert
+            Assert.IsTrue(healthStatus.IsHealthy);
+            Assert.AreEqual("Closed", healthStatus.CircuitBreakerStatus);
+            Assert.IsNotNull(healthStatus.RateLimitInfo);
+            Assert.IsTrue((DateTime.UtcNow - healthStatus.LastChecked).TotalSeconds < 5);
+        }
+        
+        [TestMethod]
+        public void ValidatePayloadSize_SizeWithinLimit_ReturnsTrue()
+        {
+            // Arrange
+            var content = new StringContent("Test content");
+            content.Headers.ContentLength = 100;
+            var apiClient = CreateApiClient();
+            
+            // Act
+            var result = apiClient.ValidatePayloadSize(content, 1000);
+            
+            // Assert
+            Assert.IsTrue(result);
+        }
+        
+        [TestMethod]
+        public void ValidatePayloadSize_SizeExceedsLimit_ReturnsFalse()
+        {
+            // Arrange
+            var content = new StringContent("Test content");
+            content.Headers.ContentLength = 2000;
+            var apiClient = CreateApiClient();
+            
+            // Act
+            var result = apiClient.ValidatePayloadSize(content, 1000);
+            
+            // Assert
+            Assert.IsFalse(result);
         }
 
         private ApiClient CreateApiClient()

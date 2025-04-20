@@ -5,6 +5,8 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Serilog;
 
 namespace LubeLoggerDashboard.Services.Api
@@ -20,6 +22,9 @@ namespace LubeLoggerDashboard.Services.Api
         private readonly SemaphoreSlim _throttleSemaphore = new SemaphoreSlim(1, 1);
         private ApiClientOptions _options;
         private CircuitBreakerState _circuitBreaker = new CircuitBreakerState();
+        private readonly Dictionary<string, bool> _detectedFeatures = new Dictionary<string, bool>();
+        private DateTime _lastHealthCheck = DateTime.MinValue;
+        private bool _isHealthy = true;
         
         // Rate limit tracking
         private int _rateLimitLimit = int.MaxValue;
@@ -41,6 +46,12 @@ namespace LubeLoggerDashboard.Services.Api
             ResetTime = _rateLimitReset,
             IsThrottled = _isThrottled
         };
+
+        /// <inheritdoc/>
+        public bool IsHealthy => _isHealthy;
+
+        /// <inheritdoc/>
+        public DateTime LastHealthCheckTime => _lastHealthCheck;
 
         /// <summary>
         /// Initializes a new instance of the ApiClient class
@@ -220,11 +231,27 @@ namespace LubeLoggerDashboard.Services.Api
                 // Try to make a simple request to check API availability
                 var response = await _httpClient.GetAsync("/api/whoami");
                 
+                // Update health status
+                _isHealthy = response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.Unauthorized;
+                _lastHealthCheck = DateTime.UtcNow;
+                
+                // Log health check result
+                if (_isHealthy)
+                {
+                    Log.Information("API health check successful. Status code: {StatusCode}", response.StatusCode);
+                }
+                else
+                {
+                    Log.Warning("API health check failed. Status code: {StatusCode}", response.StatusCode);
+                }
+                
                 // 401 is expected if not authenticated, but means the API is available
-                return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.Unauthorized;
+                return _isHealthy;
             }
             catch (Exception ex)
             {
+                _isHealthy = false;
+                _lastHealthCheck = DateTime.UtcNow;
                 Log.Error(ex, "API availability check failed");
                 return false;
             }
@@ -235,6 +262,90 @@ namespace LubeLoggerDashboard.Services.Api
         {
             _circuitBreaker.Reset();
             Log.Information("Circuit breaker reset");
+        }
+        
+        /// <inheritdoc/>
+        public async Task<bool> DetectFeatureAsync(string featureName, string testEndpoint)
+        {
+            if (_detectedFeatures.TryGetValue(featureName, out bool isSupported))
+            {
+                return isSupported;
+            }
+            
+            try
+            {
+                Log.Debug("Detecting feature: {FeatureName} using endpoint: {Endpoint}", featureName, testEndpoint);
+                var response = await GetAsync(testEndpoint);
+                
+                // Consider the feature supported if the response is successful or returns a 404
+                // (404 means the endpoint exists but the resource wasn't found)
+                isSupported = response.IsSuccessStatusCode ||
+                              response.StatusCode == System.Net.HttpStatusCode.NotFound;
+                
+                _detectedFeatures[featureName] = isSupported;
+                Log.Information("Feature detection result: {FeatureName} is {SupportStatus}",
+                    featureName, isSupported ? "supported" : "not supported");
+                
+                return isSupported;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Feature detection failed for {FeatureName}", featureName);
+                _detectedFeatures[featureName] = false;
+                return false;
+            }
+        }
+        
+        /// <inheritdoc/>
+        public void ClearFeatureCache()
+        {
+            _detectedFeatures.Clear();
+            Log.Information("Feature detection cache cleared");
+        }
+        
+        /// <inheritdoc/>
+        public async Task<ApiHealthStatus> GetDetailedHealthStatusAsync()
+        {
+            var status = new ApiHealthStatus
+            {
+                IsHealthy = await IsApiAvailableAsync(),
+                LastChecked = DateTime.UtcNow,
+                CircuitBreakerStatus = _circuitBreaker.IsOpen ? "Open" : (_circuitBreaker._state == CircuitState.HalfOpen ? "Half-Open" : "Closed"),
+                RateLimitInfo = RateLimitStatus
+            };
+            
+            Log.Information("Detailed health status: IsHealthy={IsHealthy}, CircuitBreaker={CircuitBreaker}, RateLimit={RateLimit}/{TotalLimit}",
+                status.IsHealthy, status.CircuitBreakerStatus, status.RateLimitInfo.Remaining, status.RateLimitInfo.Limit);
+            
+            return status;
+        }
+        
+        /// <inheritdoc/>
+        public bool ValidatePayloadSize(HttpContent content, long maxSizeBytes)
+        {
+            if (content == null)
+            {
+                return true;
+            }
+            
+            try
+            {
+                var contentLength = content.Headers.ContentLength ?? 0;
+                var isValid = contentLength <= maxSizeBytes;
+                
+                if (!isValid)
+                {
+                    Log.Warning("Payload size validation failed. Size: {Size} bytes, Max allowed: {MaxSize} bytes",
+                        contentLength, maxSizeBytes);
+                }
+                
+                return isValid;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error validating payload size");
+                return false;
+            }
         }
 
         /// <summary>
@@ -520,7 +631,7 @@ namespace LubeLoggerDashboard.Services.Api
         private int _failureCount;
         private readonly int _failureThreshold;
         private readonly TimeSpan _resetTimeout;
-        private CircuitState _state = CircuitState.Closed;
+        internal CircuitState _state = CircuitState.Closed;
         
         /// <summary>
         /// Gets the time when the circuit breaker will reset
@@ -590,7 +701,7 @@ namespace LubeLoggerDashboard.Services.Api
         /// <summary>
         /// Represents the state of the circuit
         /// </summary>
-        private enum CircuitState
+        internal enum CircuitState
         {
             /// <summary>
             /// Circuit is closed and requests are allowed
@@ -607,5 +718,36 @@ namespace LubeLoggerDashboard.Services.Api
             /// </summary>
             HalfOpen
         }
+    }
+    
+    /// <summary>
+    /// Detailed health status of the API
+    /// </summary>
+    public class ApiHealthStatus
+    {
+        /// <summary>
+        /// Gets or sets a value indicating whether the API is healthy
+        /// </summary>
+        public bool IsHealthy { get; set; }
+        
+        /// <summary>
+        /// Gets or sets the time when the health status was last checked
+        /// </summary>
+        public DateTime LastChecked { get; set; }
+        
+        /// <summary>
+        /// Gets or sets the current circuit breaker status
+        /// </summary>
+        public string CircuitBreakerStatus { get; set; }
+        
+        /// <summary>
+        /// Gets or sets the current rate limit information
+        /// </summary>
+        public RateLimitInfo RateLimitInfo { get; set; }
+        
+        /// <summary>
+        /// Gets or sets additional diagnostic information
+        /// </summary>
+        public Dictionary<string, string> Diagnostics { get; set; } = new Dictionary<string, string>();
     }
 }
