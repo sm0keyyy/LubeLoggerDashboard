@@ -411,6 +411,7 @@ Example data structures based on the Postman collection:
   - [x] Design database schema
   - [x] Implement entity classes
   - [x] Create DbContext with configuration
+  - [x] Implement database initializer for migrations
   - [ ] Implement cache service and sync service
 - [x] Set up secure credential storage
 

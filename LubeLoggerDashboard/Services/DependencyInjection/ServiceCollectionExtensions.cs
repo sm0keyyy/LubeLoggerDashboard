@@ -1,5 +1,7 @@
 using System;
 using LubeLoggerDashboard.Helpers.Security;
+using LubeLoggerDashboard.Models.Database.Context;
+using LubeLoggerDashboard.Models.Database.Initialization;
 using LubeLoggerDashboard.Services.Api;
 using LubeLoggerDashboard.Services.Api.Interfaces;
 using LubeLoggerDashboard.Services.Authentication;
@@ -32,6 +34,10 @@ namespace LubeLoggerDashboard.Services.DependencyInjection
 
             // Register logging services
             services.AddLoggingServices();
+
+            // Register database services
+            services.AddDbContext<LubeLoggerDbContext>();
+            services.AddTransient<IDatabaseInitializer, DatabaseInitializer>();
 
             // Register security services
             services.AddSingleton<ICredentialManager, CredentialManager>();

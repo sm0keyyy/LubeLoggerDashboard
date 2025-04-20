@@ -38,7 +38,7 @@
   - [x] Create migration strategy
   - [x] Define caching strategy
   - [x] Implement entity classes and DbContext
-  - [ ] Create database initializer
+  - [x] Create database initializer
   - [ ] Implement cache service
   - [ ] Implement sync service
 - [x] Create base ViewModel classes and common utilities

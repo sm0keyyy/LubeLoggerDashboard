@@ -1,9 +1,11 @@
 using System;
+using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using LubeLoggerDashboard.Services.Authentication;
 using LubeLoggerDashboard.Services.Api;
 using LubeLoggerDashboard.Helpers.Security;
+using LubeLoggerDashboard.Models.Database.Initialization;
 using LubeLoggerDashboard.Services.DependencyInjection;
 using LubeLoggerDashboard.Services.Logging;
 using LubeLoggerDashboard.Services.Configuration;
@@ -58,7 +60,7 @@ namespace LubeLoggerDashboard
             _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
         }
 
-        protected override void OnStartup(StartupEventArgs e)
+        protected override async void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
             
@@ -68,11 +70,34 @@ namespace LubeLoggerDashboard
                 ServiceLocator.Initialize(ServiceProvider);
                 
                 _logger.Information("Application starting up");
+                
+                // Initialize database
+                await InitializeDatabaseAsync();
             }
             catch (Exception ex)
             {
                 // If logging service fails, fall back to static Log
                 Log.Fatal(ex, "Application failed to start");
+            }
+        }
+        
+        /// <summary>
+        /// Initializes the database by ensuring it exists and applying all migrations.
+        /// </summary>
+        private async Task InitializeDatabaseAsync()
+        {
+            try
+            {
+                _logger.Information("Initializing database...");
+                var databaseInitializer = ServiceProvider.GetRequiredService<IDatabaseInitializer>();
+                await databaseInitializer.InitializeAsync();
+                _logger.Information("Database initialization completed successfully.");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "An error occurred while initializing the database.");
+                // We don't rethrow here to allow the application to continue even if database initialization fails
+                // The application should handle database unavailability gracefully
             }
         }
 
