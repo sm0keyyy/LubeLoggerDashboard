@@ -33,6 +33,14 @@
   - [x] Update MainWindow to include navigation frame
   - [x] Create ShellViewModel
 - [ ] Implement local caching system using SQLite and EF Core
+  - [x] Design database schema for entity classes
+  - [x] Document design decisions and rationale
+  - [x] Create migration strategy
+  - [x] Define caching strategy
+  - [x] Implement entity classes and DbContext
+  - [ ] Create database initializer
+  - [ ] Implement cache service
+  - [ ] Implement sync service
 - [x] Create base ViewModel classes and common utilities
 
 ## Phase 2: Vehicle Management
