@@ -454,382 +454,382 @@ namespace LubeLoggerDashboard.Services.Sync
                 return new SyncResult();
             }
     
-            #region Private Helper Methods
-    
-            private async Task<SyncResult> UploadPendingChangesForEntityAsync<T>() where T : BaseEntity
+        #region Private Helper Methods
+
+        private async Task<SyncResult> UploadPendingChangesForEntityAsync<T>() where T : BaseEntity
+        {
+            var result = new SyncResult();
+            var entityName = typeof(T).Name;
+            
+            try
             {
-                var result = new SyncResult();
-                var entityName = typeof(T).Name;
+                OnSyncStatusChanged(entityName, SyncOperation.Upload, SyncStatus.Started);
                 
-                try
+                // Get all entities that need to be synchronized
+                var pendingEntities = await _cacheService.GetPendingSyncItemsAsync<T>();
+                
+                if (!pendingEntities.Any())
                 {
-                    OnSyncStatusChanged(entityName, SyncOperation.Upload, SyncStatus.Started);
-                    
-                    // Get all entities that need to be synchronized
-                    var pendingEntities = await _cacheService.GetPendingSyncItemsAsync<T>();
-                    
-                    if (!pendingEntities.Any())
-                    {
-                        _logger.LogInformation($"No pending changes for {entityName}");
-                        OnSyncStatusChanged(entityName, SyncOperation.Upload, SyncStatus.Skipped, "No pending changes");
-                        return result;
-                    }
-                    
-                    _logger.LogInformation($"Uploading {pendingEntities.Count()} pending changes for {entityName}");
-                    
-                    foreach (var entity in pendingEntities)
-                    {
-                        if (_syncCancellationTokenSource.Token.IsCancellationRequested)
-                        {
-                            _logger.LogInformation($"Upload cancelled for {entityName}");
-                            break;
-                        }
-                        
-                        try
-                        {
-                            await UploadEntityToServerAsync(entity);
-                            result.AddSuccess(entityName, entity.Id);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, $"Error uploading {entityName} with ID {entity.Id}");
-                            result.AddFailure(entityName, entity.Id, ex);
-                        }
-                    }
-                    
-                    OnSyncStatusChanged(entityName, SyncOperation.Upload,
-                        result.Status == SyncResultStatus.Success ? SyncStatus.Completed : SyncStatus.Failed);
-                    
+                    _logger.LogInformation($"No pending changes for {entityName}");
+                    OnSyncStatusChanged(entityName, SyncOperation.Upload, SyncStatus.Skipped, "No pending changes");
                     return result;
                 }
-                catch (Exception ex)
+                
+                _logger.LogInformation($"Uploading {pendingEntities.Count()} pending changes for {entityName}");
+                
+                foreach (var entity in pendingEntities)
                 {
-                    _logger.LogError(ex, $"Error during upload of pending changes for {entityName}");
-                    OnSyncStatusChanged(entityName, SyncOperation.Upload, SyncStatus.Failed, ex.Message);
-                    return result;
+                    if (_syncCancellationTokenSource.Token.IsCancellationRequested)
+                    {
+                        _logger.LogInformation($"Upload cancelled for {entityName}");
+                        break;
+                    }
+                    
+                    try
+                    {
+                        await UploadEntityToServerAsync(entity);
+                        result.AddSuccess(entityName, entity.Id);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Error uploading {entityName} with ID {entity.Id}");
+                        result.AddFailure(entityName, entity.Id, ex);
+                    }
                 }
+                
+                OnSyncStatusChanged(entityName, SyncOperation.Upload,
+                    result.Status == SyncResultStatus.Success ? SyncStatus.Completed : SyncStatus.Failed);
+                
+                return result;
             }
-    
-            private async Task<SyncResult> UploadEntityToServerAsync<T>(T entity) where T : BaseEntity
+            catch (Exception ex)
             {
-                var result = new SyncResult();
-                var entityName = typeof(T).Name;
-                
-                try
+                _logger.LogError(ex, $"Error during upload of pending changes for {entityName}");
+                OnSyncStatusChanged(entityName, SyncOperation.Upload, SyncStatus.Failed, ex.Message);
+                return result;
+            }
+        }
+
+        private async Task<SyncResult> UploadEntityToServerAsync<T>(T entity) where T : BaseEntity
+        {
+            var result = new SyncResult();
+            var entityName = typeof(T).Name;
+            
+            try
+            {
+                switch (entity.SyncStatus)
                 {
-                    switch (entity.SyncStatus)
-                    {
-                        case Models.Database.Enums.SyncStatus.PendingUpload:
-                            await CreateEntityOnServerAsync(entity);
-                            break;
-                        
-                        case Models.Database.Enums.SyncStatus.PendingUpdate:
-                            await UpdateEntityOnServerAsync(entity);
-                            break;
-                        
-                        case Models.Database.Enums.SyncStatus.PendingDeletion:
-                            await DeleteEntityOnServerAsync(entity);
-                            break;
-                        
-                        case Models.Database.Enums.SyncStatus.SyncFailed:
-                            // Retry the operation based on IsDirty flag
-                            if (entity.IsDirty)
+                    case Models.Database.Enums.SyncStatus.PendingUpload:
+                        await CreateEntityOnServerAsync(entity);
+                        break;
+                    
+                    case Models.Database.Enums.SyncStatus.PendingUpdate:
+                        await UpdateEntityOnServerAsync(entity);
+                        break;
+                    
+                    case Models.Database.Enums.SyncStatus.PendingDeletion:
+                        await DeleteEntityOnServerAsync(entity);
+                        break;
+                    
+                    case Models.Database.Enums.SyncStatus.SyncFailed:
+                        // Retry the operation based on IsDirty flag
+                        if (entity.IsDirty)
+                        {
+                            if (entity.Id <= 0)
                             {
-                                if (entity.Id <= 0)
-                                {
-                                    await CreateEntityOnServerAsync(entity);
-                                }
-                                else
-                                {
-                                    await UpdateEntityOnServerAsync(entity);
-                                }
+                                await CreateEntityOnServerAsync(entity);
                             }
-                            break;
-                    }
-                    
-                    // Mark as synced
-                    await _cacheService.MarkAsSyncedAsync(entity);
-                    
-                    result.AddSuccess(entityName, entity.Id);
-                    return result;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, $"Error uploading {entityName} with ID {entity.Id}");
-                    
-                    // Mark as failed
-                    entity.SyncStatus = Models.Database.Enums.SyncStatus.SyncFailed;
-                    await _dbContext.SaveChangesAsync();
-                    
-                    result.AddFailure(entityName, entity.Id, ex);
-                    return result;
-                }
-            }
-    
-            private async Task CreateEntityOnServerAsync<T>(T entity) where T : BaseEntity
-            {
-                if (typeof(T) == typeof(Vehicle))
-                {
-                    await _vehicleService.CreateVehicleAsync(entity as Vehicle);
-                }
-                else if (typeof(T) == typeof(OdometerRecord))
-                {
-                    await _odometerRecordService.CreateOdometerRecordAsync(entity as OdometerRecord);
-                }
-                else if (typeof(T) == typeof(PlanRecord))
-                {
-                    await _planRecordService.CreatePlanRecordAsync(entity as PlanRecord);
-                }
-                else if (typeof(T) == typeof(ServiceRecord))
-                {
-                    await _serviceRecordService.CreateServiceRecordAsync(entity as ServiceRecord);
-                }
-                else if (typeof(T) == typeof(RepairRecord))
-                {
-                    await _repairRecordService.CreateRepairRecordAsync(entity as RepairRecord);
-                }
-                else if (typeof(T) == typeof(UpgradeRecord))
-                {
-                    await _upgradeRecordService.CreateUpgradeRecordAsync(entity as UpgradeRecord);
-                }
-                else if (typeof(T) == typeof(TaxRecord))
-                {
-                    await _taxRecordService.CreateTaxRecordAsync(entity as TaxRecord);
-                }
-                else if (typeof(T) == typeof(GasRecord))
-                {
-                    await _gasRecordService.CreateGasRecordAsync(entity as GasRecord);
-                }
-                else if (typeof(T) == typeof(Reminder))
-                {
-                    await _reminderService.CreateReminderAsync(entity as Reminder);
-                }
-                else
-                {
-                    throw new NotSupportedException($"Entity type {typeof(T).Name} is not supported for server creation");
-                }
-            }
-    
-            private async Task UpdateEntityOnServerAsync<T>(T entity) where T : BaseEntity
-            {
-                if (typeof(T) == typeof(Vehicle))
-                {
-                    await _vehicleService.UpdateVehicleAsync(entity as Vehicle);
-                }
-                else if (typeof(T) == typeof(OdometerRecord))
-                {
-                    await _odometerRecordService.UpdateOdometerRecordAsync(entity as OdometerRecord);
-                }
-                else if (typeof(T) == typeof(PlanRecord))
-                {
-                    await _planRecordService.UpdatePlanRecordAsync(entity as PlanRecord);
-                }
-                else if (typeof(T) == typeof(ServiceRecord))
-                {
-                    await _serviceRecordService.UpdateServiceRecordAsync(entity as ServiceRecord);
-                }
-                else if (typeof(T) == typeof(RepairRecord))
-                {
-                    await _repairRecordService.UpdateRepairRecordAsync(entity as RepairRecord);
-                }
-                else if (typeof(T) == typeof(UpgradeRecord))
-                {
-                    await _upgradeRecordService.UpdateUpgradeRecordAsync(entity as UpgradeRecord);
-                }
-                else if (typeof(T) == typeof(TaxRecord))
-                {
-                    await _taxRecordService.UpdateTaxRecordAsync(entity as TaxRecord);
-                }
-                else if (typeof(T) == typeof(GasRecord))
-                {
-                    await _gasRecordService.UpdateGasRecordAsync(entity as GasRecord);
-                }
-                else if (typeof(T) == typeof(Reminder))
-                {
-                    await _reminderService.UpdateReminderAsync(entity as Reminder);
-                }
-                else
-                {
-                    throw new NotSupportedException($"Entity type {typeof(T).Name} is not supported for server update");
-                }
-            }
-    
-            private async Task DeleteEntityOnServerAsync<T>(T entity) where T : BaseEntity
-            {
-                if (typeof(T) == typeof(Vehicle))
-                {
-                    await _vehicleService.DeleteVehicleAsync(entity.Id);
-                }
-                else if (typeof(T) == typeof(OdometerRecord))
-                {
-                    await _odometerRecordService.DeleteOdometerRecordAsync(entity.Id);
-                }
-                else if (typeof(T) == typeof(PlanRecord))
-                {
-                    await _planRecordService.DeletePlanRecordAsync(entity.Id);
-                }
-                else if (typeof(T) == typeof(ServiceRecord))
-                {
-                    await _serviceRecordService.DeleteServiceRecordAsync(entity.Id);
-                }
-                else if (typeof(T) == typeof(RepairRecord))
-                {
-                    await _repairRecordService.DeleteRepairRecordAsync(entity.Id);
-                }
-                else if (typeof(T) == typeof(UpgradeRecord))
-                {
-                    await _upgradeRecordService.DeleteUpgradeRecordAsync(entity.Id);
-                }
-                else if (typeof(T) == typeof(TaxRecord))
-                {
-                    await _taxRecordService.DeleteTaxRecordAsync(entity.Id);
-                }
-                else if (typeof(T) == typeof(GasRecord))
-                {
-                    await _gasRecordService.DeleteGasRecordAsync(entity.Id);
-                }
-                else if (typeof(T) == typeof(Reminder))
-                {
-                    await _reminderService.DeleteReminderAsync(entity.Id);
-                }
-                else
-                {
-                    throw new NotSupportedException($"Entity type {typeof(T).Name} is not supported for server deletion");
+                            else
+                            {
+                                await UpdateEntityOnServerAsync(entity);
+                            }
+                        }
+                        break;
                 }
                 
-                // Remove from local database after successful server deletion
-                _dbContext.Set<T>().Remove(entity);
+                // Mark as synced
+                await _cacheService.MarkAsSyncedAsync(entity);
+                
+                result.AddSuccess(entityName, entity.Id);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error uploading {entityName} with ID {entity.Id}");
+                
+                // Mark as failed
+                entity.SyncStatus = Models.Database.Enums.SyncStatus.SyncFailed;
                 await _dbContext.SaveChangesAsync();
-            }
-    
-            private async Task<SyncResult> RefreshEntityFromServerAsync<T>(int? specificEntityId = null) where T : BaseEntity
-            {
-                var result = new SyncResult();
-                var entityName = typeof(T).Name;
                 
-                try
-                {
-                    OnSyncStatusChanged(entityName, SyncOperation.Download, SyncStatus.Started);
-                    
-                    if (typeof(T) == typeof(Vehicle))
-                    {
-                        if (specificEntityId.HasValue)
-                        {
-                            var vehicle = await _vehicleService.GetVehicleAsync(specificEntityId.Value);
-                            await UpdateLocalEntityAsync(vehicle, result);
-                        }
-                        else
-                        {
-                            var vehicles = await _vehicleService.GetAllVehiclesAsync();
-                            foreach (var vehicle in vehicles)
-                            {
-                                if (_syncCancellationTokenSource.Token.IsCancellationRequested)
-                                    break;
-                                    
-                                await UpdateLocalEntityAsync(vehicle, result);
-                            }
-                        }
-                    }
-                    else if (typeof(T) == typeof(OdometerRecord))
-                    {
-                        if (specificEntityId.HasValue)
-                        {
-                            var record = await _odometerRecordService.GetOdometerRecordAsync(specificEntityId.Value);
-                            await UpdateLocalEntityAsync(record, result);
-                        }
-                        else
-                        {
-                            var records = await _odometerRecordService.GetAllOdometerRecordsAsync();
-                            foreach (var record in records)
-                            {
-                                if (_syncCancellationTokenSource.Token.IsCancellationRequested)
-                                    break;
-                                    
-                                await UpdateLocalEntityAsync(record, result);
-                            }
-                        }
-                    }
-                    // Similar implementation for other entity types
-                    // ...
-                    
-                    OnSyncStatusChanged(entityName, SyncOperation.Download,
-                        result.Status == SyncResultStatus.Success ? SyncStatus.Completed : SyncStatus.Failed);
-                    
-                    return result;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, $"Error refreshing {entityName} from server");
-                    OnSyncStatusChanged(entityName, SyncOperation.Download, SyncStatus.Failed, ex.Message);
-                    return result;
-                }
+                result.AddFailure(entityName, entity.Id, ex);
+                return result;
             }
-    
-            private async Task UpdateLocalEntityAsync<T>(T serverEntity, SyncResult result) where T : BaseEntity
+        }
+
+        private async Task CreateEntityOnServerAsync<T>(T entity) where T : BaseEntity
+        {
+            if (typeof(T) == typeof(Vehicle))
             {
-                if (serverEntity == null)
-                    return;
-                    
-                var entityName = typeof(T).Name;
+                await _vehicleService.CreateVehicleAsync(entity as Vehicle);
+            }
+            else if (typeof(T) == typeof(OdometerRecord))
+            {
+                await _odometerRecordService.CreateOdometerRecordAsync(entity as OdometerRecord);
+            }
+            else if (typeof(T) == typeof(PlanRecord))
+            {
+                await _planRecordService.CreatePlanRecordAsync(entity as PlanRecord);
+            }
+            else if (typeof(T) == typeof(ServiceRecord))
+            {
+                await _serviceRecordService.CreateServiceRecordAsync(entity as ServiceRecord);
+            }
+            else if (typeof(T) == typeof(RepairRecord))
+            {
+                await _repairRecordService.CreateRepairRecordAsync(entity as RepairRecord);
+            }
+            else if (typeof(T) == typeof(UpgradeRecord))
+            {
+                await _upgradeRecordService.CreateUpgradeRecordAsync(entity as UpgradeRecord);
+            }
+            else if (typeof(T) == typeof(TaxRecord))
+            {
+                await _taxRecordService.CreateTaxRecordAsync(entity as TaxRecord);
+            }
+            else if (typeof(T) == typeof(GasRecord))
+            {
+                await _gasRecordService.CreateGasRecordAsync(entity as GasRecord);
+            }
+            else if (typeof(T) == typeof(Reminder))
+            {
+                await _reminderService.CreateReminderAsync(entity as Reminder);
+            }
+            else
+            {
+                throw new NotSupportedException($"Entity type {typeof(T).Name} is not supported for server creation");
+            }
+        }
+
+        private async Task UpdateEntityOnServerAsync<T>(T entity) where T : BaseEntity
+        {
+            if (typeof(T) == typeof(Vehicle))
+            {
+                await _vehicleService.UpdateVehicleAsync(entity as Vehicle);
+            }
+            else if (typeof(T) == typeof(OdometerRecord))
+            {
+                await _odometerRecordService.UpdateOdometerRecordAsync(entity as OdometerRecord);
+            }
+            else if (typeof(T) == typeof(PlanRecord))
+            {
+                await _planRecordService.UpdatePlanRecordAsync(entity as PlanRecord);
+            }
+            else if (typeof(T) == typeof(ServiceRecord))
+            {
+                await _serviceRecordService.UpdateServiceRecordAsync(entity as ServiceRecord);
+            }
+            else if (typeof(T) == typeof(RepairRecord))
+            {
+                await _repairRecordService.UpdateRepairRecordAsync(entity as RepairRecord);
+            }
+            else if (typeof(T) == typeof(UpgradeRecord))
+            {
+                await _upgradeRecordService.UpdateUpgradeRecordAsync(entity as UpgradeRecord);
+            }
+            else if (typeof(T) == typeof(TaxRecord))
+            {
+                await _taxRecordService.UpdateTaxRecordAsync(entity as TaxRecord);
+            }
+            else if (typeof(T) == typeof(GasRecord))
+            {
+                await _gasRecordService.UpdateGasRecordAsync(entity as GasRecord);
+            }
+            else if (typeof(T) == typeof(Reminder))
+            {
+                await _reminderService.UpdateReminderAsync(entity as Reminder);
+            }
+            else
+            {
+                throw new NotSupportedException($"Entity type {typeof(T).Name} is not supported for server update");
+            }
+        }
+
+        private async Task DeleteEntityOnServerAsync<T>(T entity) where T : BaseEntity
+        {
+            if (typeof(T) == typeof(Vehicle))
+            {
+                await _vehicleService.DeleteVehicleAsync(entity.Id);
+            }
+            else if (typeof(T) == typeof(OdometerRecord))
+            {
+                await _odometerRecordService.DeleteOdometerRecordAsync(entity.Id);
+            }
+            else if (typeof(T) == typeof(PlanRecord))
+            {
+                await _planRecordService.DeletePlanRecordAsync(entity.Id);
+            }
+            else if (typeof(T) == typeof(ServiceRecord))
+            {
+                await _serviceRecordService.DeleteServiceRecordAsync(entity.Id);
+            }
+            else if (typeof(T) == typeof(RepairRecord))
+            {
+                await _repairRecordService.DeleteRepairRecordAsync(entity.Id);
+            }
+            else if (typeof(T) == typeof(UpgradeRecord))
+            {
+                await _upgradeRecordService.DeleteUpgradeRecordAsync(entity.Id);
+            }
+            else if (typeof(T) == typeof(TaxRecord))
+            {
+                await _taxRecordService.DeleteTaxRecordAsync(entity.Id);
+            }
+            else if (typeof(T) == typeof(GasRecord))
+            {
+                await _gasRecordService.DeleteGasRecordAsync(entity.Id);
+            }
+            else if (typeof(T) == typeof(Reminder))
+            {
+                await _reminderService.DeleteReminderAsync(entity.Id);
+            }
+            else
+            {
+                throw new NotSupportedException($"Entity type {typeof(T).Name} is not supported for server deletion");
+            }
+            
+            // Remove from local database after successful server deletion
+            _dbContext.Set<T>().Remove(entity);
+            await _dbContext.SaveChangesAsync();
+        }
+
+        private async Task<SyncResult> RefreshEntityFromServerAsync<T>(int? specificEntityId = null) where T : BaseEntity
+        {
+            var result = new SyncResult();
+            var entityName = typeof(T).Name;
+            
+            try
+            {
+                OnSyncStatusChanged(entityName, SyncOperation.Download, SyncStatus.Started);
                 
-                try
+                if (typeof(T) == typeof(Vehicle))
                 {
-                    // Find the entity in the local database
-                    var localEntity = await _dbContext.Set<T>().FindAsync(serverEntity.Id);
-                    
-                    if (localEntity == null)
+                    if (specificEntityId.HasValue)
                     {
-                        // Entity doesn't exist locally, add it
-                        _dbContext.Set<T>().Add(serverEntity);
-                        serverEntity.SyncStatus = Models.Database.Enums.SyncStatus.Synced;
-                        serverEntity.LastSyncTimestamp = DateTime.Now;
-                        await _cacheService.UpdateExpirationAsync(serverEntity);
-                        result.AddSuccess(entityName, serverEntity.Id);
+                        var vehicle = await _vehicleService.GetVehicleAsync(specificEntityId.Value);
+                        await UpdateLocalEntityAsync(vehicle, result);
                     }
                     else
                     {
-                        // Entity exists locally, check if it has pending changes
-                        if (localEntity.SyncStatus == Models.Database.Enums.SyncStatus.Synced ||
-                            localEntity.SyncStatus == Models.Database.Enums.SyncStatus.SyncFailed)
+                        var vehicles = await _vehicleService.GetAllVehiclesAsync();
+                        foreach (var vehicle in vehicles)
                         {
-                            // Update the local entity with server data
-                            _dbContext.Entry(localEntity).CurrentValues.SetValues(serverEntity);
-                            localEntity.SyncStatus = Models.Database.Enums.SyncStatus.Synced;
-                            localEntity.LastSyncTimestamp = DateTime.Now;
-                            await _cacheService.UpdateExpirationAsync(localEntity);
-                            result.AddSuccess(entityName, localEntity.Id);
-                        }
-                        else
-                        {
-                            // Local entity has pending changes, handle conflict
-                            // Default to "server wins" strategy
-                            _dbContext.Entry(localEntity).CurrentValues.SetValues(serverEntity);
-                            localEntity.SyncStatus = Models.Database.Enums.SyncStatus.Synced;
-                            localEntity.LastSyncTimestamp = DateTime.Now;
-                            localEntity.IsDirty = false;
-                            await _cacheService.UpdateExpirationAsync(localEntity);
-                            result.AddConflict(entityName, localEntity.Id, "Server data used (server wins)");
-                            
-                            OnSyncStatusChanged(entityName, SyncOperation.ConflictResolution,
-                                SyncStatus.ConflictDetected, "Conflict resolved using server data");
+                            if (_syncCancellationTokenSource.Token.IsCancellationRequested)
+                                break;
+                                
+                            await UpdateLocalEntityAsync(vehicle, result);
                         }
                     }
-                    
-                    await _dbContext.SaveChangesAsync();
                 }
-                catch (Exception ex)
+                else if (typeof(T) == typeof(OdometerRecord))
                 {
-                    _logger.LogError(ex, $"Error updating local {entityName} with ID {serverEntity.Id}");
-                    result.AddFailure(entityName, serverEntity.Id, ex);
+                    if (specificEntityId.HasValue)
+                    {
+                        var record = await _odometerRecordService.GetOdometerRecordAsync(specificEntityId.Value);
+                        await UpdateLocalEntityAsync(record, result);
+                    }
+                    else
+                    {
+                        var records = await _odometerRecordService.GetAllOdometerRecordsAsync();
+                        foreach (var record in records)
+                        {
+                            if (_syncCancellationTokenSource.Token.IsCancellationRequested)
+                                break;
+                                
+                            await UpdateLocalEntityAsync(record, result);
+                        }
+                    }
                 }
+                // Similar implementation for other entity types
+                // ...
+                
+                OnSyncStatusChanged(entityName, SyncOperation.Download,
+                    result.Status == SyncResultStatus.Success ? SyncStatus.Completed : SyncStatus.Failed);
+                
+                return result;
             }
-    
-            private void OnSyncStatusChanged(string entityType, SyncOperation operation, SyncStatus status, string message = null)
+            catch (Exception ex)
             {
-                SyncStatusChanged?.Invoke(this, new SyncStatusChangedEventArgs(entityType, operation, status, message));
+                _logger.LogError(ex, $"Error refreshing {entityName} from server");
+                OnSyncStatusChanged(entityName, SyncOperation.Download, SyncStatus.Failed, ex.Message);
+                return result;
             }
-    
-            #endregion
+        }
+
+        private async Task UpdateLocalEntityAsync<T>(T serverEntity, SyncResult result) where T : BaseEntity
+        {
+            if (serverEntity == null)
+                return;
+                
+            var entityName = typeof(T).Name;
+            
+            try
+            {
+                // Find the entity in the local database
+                var localEntity = await _dbContext.Set<T>().FindAsync(serverEntity.Id);
+                
+                if (localEntity == null)
+                {
+                    // Entity doesn't exist locally, add it
+                    _dbContext.Set<T>().Add(serverEntity);
+                    serverEntity.SyncStatus = Models.Database.Enums.SyncStatus.Synced;
+                    serverEntity.LastSyncTimestamp = DateTime.Now;
+                    await _cacheService.UpdateExpirationAsync(serverEntity);
+                    result.AddSuccess(entityName, serverEntity.Id);
+                }
+                else
+                {
+                    // Entity exists locally, check if it has pending changes
+                    if (localEntity.SyncStatus == Models.Database.Enums.SyncStatus.Synced ||
+                        localEntity.SyncStatus == Models.Database.Enums.SyncStatus.SyncFailed)
+                    {
+                        // Update the local entity with server data
+                        _dbContext.Entry(localEntity).CurrentValues.SetValues(serverEntity);
+                        localEntity.SyncStatus = Models.Database.Enums.SyncStatus.Synced;
+                        localEntity.LastSyncTimestamp = DateTime.Now;
+                        await _cacheService.UpdateExpirationAsync(localEntity);
+                        result.AddSuccess(entityName, localEntity.Id);
+                    }
+                    else
+                    {
+                        // Local entity has pending changes, handle conflict
+                        // Default to "server wins" strategy
+                        _dbContext.Entry(localEntity).CurrentValues.SetValues(serverEntity);
+                        localEntity.SyncStatus = Models.Database.Enums.SyncStatus.Synced;
+                        localEntity.LastSyncTimestamp = DateTime.Now;
+                        localEntity.IsDirty = false;
+                        await _cacheService.UpdateExpirationAsync(localEntity);
+                        result.AddConflict(entityName, localEntity.Id, "Server data used (server wins)");
+                        
+                        OnSyncStatusChanged(entityName, SyncOperation.ConflictResolution,
+                            SyncStatus.ConflictDetected, "Conflict resolved using server data");
+                    }
+                }
+                
+                await _dbContext.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error updating local {entityName} with ID {serverEntity.Id}");
+                result.AddFailure(entityName, serverEntity.Id, ex);
+            }
+        }
+
+        private void OnSyncStatusChanged(string entityType, SyncOperation operation, SyncStatus status, string message = null)
+        {
+            SyncStatusChanged?.Invoke(this, new SyncStatusChangedEventArgs(entityType, operation, status, message));
+        }
+
+        #endregion
 
             try
             {
