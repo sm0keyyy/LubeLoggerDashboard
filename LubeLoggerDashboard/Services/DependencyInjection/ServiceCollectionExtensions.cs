@@ -5,6 +5,7 @@ using LubeLoggerDashboard.Models.Database.Initialization;
 using LubeLoggerDashboard.Services.Api;
 using LubeLoggerDashboard.Services.Api.Interfaces;
 using LubeLoggerDashboard.Services.Authentication;
+using LubeLoggerDashboard.Services.Cache;
 using LubeLoggerDashboard.Services.Configuration;
 using LubeLoggerDashboard.Services.Logging;
 using Microsoft.Extensions.DependencyInjection;
@@ -38,6 +39,9 @@ namespace LubeLoggerDashboard.Services.DependencyInjection
             // Register database services
             services.AddDbContext<LubeLoggerDbContext>();
             services.AddTransient<IDatabaseInitializer, DatabaseInitializer>();
+            
+            // Register cache services
+            services.AddScoped<ICacheService, CacheService>();
 
             // Register security services
             services.AddSingleton<ICredentialManager, CredentialManager>();
