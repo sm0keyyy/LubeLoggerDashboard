@@ -6,7 +6,6 @@ The LubeLogger Dashboard is a native Windows desktop application that serves as 
 
 ## API Information
 
-The LubeLogger API exists at: https://lubelogger.the-freed.family/api
 A demo instance is available at: https://demo.lubelogger.com/api
 
 Initial testing confirms that the API requires authentication (received 401 Unauthorized error). This validates our assumption that the API exists, but highlights that proper authentication will be a critical component of our integration.
