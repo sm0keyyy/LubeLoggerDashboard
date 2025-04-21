@@ -1,8 +1,16 @@
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LubeLoggerDashboard", "LubeLoggerDashboard\LubeLoggerDashboard.csproj", "{70FD383E-F4D2-F4CB-CC45-6C298C91F466}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LubeLoggerDashboard.UI", "LubeLoggerDashboard.UI\LubeLoggerDashboard.UI.csproj", "{B083C9CC-B676-4CFB-9876-DF84E6AA53F5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LubeLoggerDashboard.Core", "LubeLoggerDashboard.Core\LubeLoggerDashboard.Core.csproj", "{C5D4A3F7-B87E-4D79-B5F3-549E46D1F5A8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LubeLoggerDashboard.Infrastructure", "LubeLoggerDashboard.Infrastructure\LubeLoggerDashboard.Infrastructure.csproj", "{D7E5B8F9-A1C3-4D6E-B8F7-2A9C8E5A6F0D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LubeLoggerDashboard.Tests", "LubeLoggerDashboard.Tests\LubeLoggerDashboard.Tests.csproj", "{E8F6A9B2-D5C7-4E8A-B9F1-3C7D8E6A7F0E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -14,6 +22,22 @@ Global
 		{70FD383E-F4D2-F4CB-CC45-6C298C91F466}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{70FD383E-F4D2-F4CB-CC45-6C298C91F466}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{70FD383E-F4D2-F4CB-CC45-6C298C91F466}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B083C9CC-B676-4CFB-9876-DF84E6AA53F5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B083C9CC-B676-4CFB-9876-DF84E6AA53F5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B083C9CC-B676-4CFB-9876-DF84E6AA53F5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B083C9CC-B676-4CFB-9876-DF84E6AA53F5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C5D4A3F7-B87E-4D79-B5F3-549E46D1F5A8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C5D4A3F7-B87E-4D79-B5F3-549E46D1F5A8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C5D4A3F7-B87E-4D79-B5F3-549E46D1F5A8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C5D4A3F7-B87E-4D79-B5F3-549E46D1F5A8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D7E5B8F9-A1C3-4D6E-B8F7-2A9C8E5A6F0D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D7E5B8F9-A1C3-4D6E-B8F7-2A9C8E5A6F0D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D7E5B8F9-A1C3-4D6E-B8F7-2A9C8E5A6F0D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D7E5B8F9-A1C3-4D6E-B8F7-2A9C8E5A6F0D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E8F6A9B2-D5C7-4E8A-B9F1-3C7D8E6A7F0E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E8F6A9B2-D5C7-4E8A-B9F1-3C7D8E6A7F0E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E8F6A9B2-D5C7-4E8A-B9F1-3C7D8E6A7F0E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E8F6A9B2-D5C7-4E8A-B9F1-3C7D8E6A7F0E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,0 +1,70 @@
+<UserControl x:Class="LubeLoggerDashboard.UI.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:LubeLoggerDashboard.UI.Views"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    <Grid Margin="20">
+        <StackPanel>
+            <TextBlock Text="Settings" FontSize="24" FontWeight="Bold" Margin="0,0,0,20"/>
+            <TextBlock Text="Configure application settings" FontSize="16" Margin="0,0,0,20"/>
+            <TextBlock Text="This is a placeholder for the settings view. In a real application, this would allow configuring various application settings." 
+                       TextWrapping="Wrap" Margin="0,0,0,20"/>
+            
+            <!-- Placeholder for application settings -->
+            <Border Background="#f5f5f5" Padding="15" CornerRadius="5" Margin="0,0,0,20">
+                <StackPanel>
+                    <TextBlock Text="Application Settings" FontWeight="Bold" Margin="0,0,0,10"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="200"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        
+                        <TextBlock Text="API Server URL:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"/>
+                        <TextBox Text="https://api.lubelogger.com" Grid.Row="0" Grid.Column="1" Margin="5"/>
+                        
+                        <TextBlock Text="Default Units:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" Margin="5" SelectedIndex="0">
+                            <ComboBoxItem Content="Miles"/>
+                            <ComboBoxItem Content="Kilometers"/>
+                        </ComboBox>
+                        
+                        <TextBlock Text="Save Credentials:" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center"/>
+                        <CheckBox Grid.Row="2" Grid.Column="1" Margin="5" IsChecked="True"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            
+            <!-- Placeholder for user settings -->
+            <Border Background="#f5f5f5" Padding="15" CornerRadius="5">
+                <StackPanel>
+                    <TextBlock Text="User Settings" FontWeight="Bold" Margin="0,0,0,10"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="200"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        
+                        <TextBlock Text="Default Vehicle:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"/>
+                        <ComboBox Grid.Row="0" Grid.Column="1" Margin="5" IsEnabled="False"/>
+                        
+                        <TextBlock Text="Notification Email:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" Margin="5"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Grid>
+</UserControl>

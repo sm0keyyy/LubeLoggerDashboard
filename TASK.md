@@ -166,12 +166,12 @@ These tasks are based on recent code review and should be prioritized.
 
 ### CRITICAL
 - [ ] **Refactor Project Structure:**
-    - [ ] Create `LubeLoggerDashboard.UI` project (WPF App).
-    - [ ] Create `LubeLoggerDashboard.Core` project (Models, Service Interfaces, Helpers).
-    - [ ] Create `LubeLoggerDashboard.Infrastructure` project (API Client, DB Context, Caching Impl).
-    - [ ] Create `LubeLoggerDashboard.Tests` project (Test Project).
-    - [ ] Move existing code to the appropriate new projects.
-    - [ ] Update solution file (`.sln`) and project references (`.csproj`).
+    - [x] Create `LubeLoggerDashboard.UI` project (WPF App).
+    - [x] Create `LubeLoggerDashboard.Core` project (Models, Service Interfaces, Helpers).
+    - [x] Create `LubeLoggerDashboard.Infrastructure` project (API Client, DB Context, Caching Impl).
+    - [x] Create `LubeLoggerDashboard.Tests` project (Test Project).
+    - [x] Move existing code to the appropriate new projects.
+    - [x] Update solution file (`.sln`) and project references (`.csproj`).
 - [ ] **Standardize Test Framework:**
     - [ ] Decide between MSTest and xUnit as the standard framework.
     - [ ] Remove NuGet packages for the unused test framework from all projects.

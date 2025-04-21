@@ -1,0 +1,110 @@
+<Window x:Class="LubeLoggerDashboard.UI.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:LubeLoggerDashboard.UI.Views"
+        xmlns:viewModels="clr-namespace:LubeLoggerDashboard.UI.ViewModels"
+        mc:Ignorable="d"
+        Title="LubeLogger Dashboard" Height="700" Width="1000"
+        d:DataContext="{d:DesignInstance Type=viewModels:ShellViewModel}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#2c3e50" Padding="10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Text="LubeLogger Dashboard" Foreground="White" FontSize="20" FontWeight="Bold"/>
+                
+                <!-- Login Status -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Visibility="{Binding IsLoggedIn, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="{Binding Username}" Foreground="White" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <Button Content="Logout" Command="{Binding LogoutCommand}" Padding="8,3" Background="#e74c3c" Foreground="White"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Content -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="250"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Navigation Panel -->
+            <Border Grid.Column="0" Background="#ecf0f1" BorderBrush="#bdc3c7" BorderThickness="0,0,1,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    
+                    <!-- Login Section (visible when not logged in) -->
+                    <Border Grid.Row="0" Background="White" CornerRadius="5" Padding="10" Margin="10"
+                            Visibility="{Binding IsLoggedIn, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                        <StackPanel>
+                            <TextBlock Text="API Authentication" FontWeight="Bold" Margin="0,0,0,10"/>
+                            <TextBlock Text="Username:" Margin="0,5,0,2"/>
+                            <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10"/>
+                            <TextBlock Text="Password:" Margin="0,0,0,2"/>
+                            <PasswordBox x:Name="PasswordBox" Margin="0,0,0,10"/>
+                            <Button Content="Login" Command="{Binding LoginCommand}" Padding="10,5" Background="#3498db" Foreground="White"/>
+                            <TextBlock Text="{Binding LoginStatusMessage}" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- Navigation Items -->
+                    <ScrollViewer Grid.Row="1" Margin="0,10,0,0">
+                        <ItemsControl ItemsSource="{Binding NavigationItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Command="{Binding Command}"
+                                            CommandParameter="{Binding ViewName}"
+                                            IsEnabled="{Binding IsEnabled}"
+                                            Margin="5,2"
+                                            Padding="10,8"
+                                            HorizontalContentAlignment="Left"
+                                            Background="{Binding IsSelected, Converter={StaticResource BooleanToBackgroundConverter}, ConverterParameter=#3498db}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding Icon}" FontFamily="Segoe MDL2 Assets" Margin="0,0,10,0"
+                                                       Foreground="{Binding IsEnabled, Converter={StaticResource BooleanToForegroundConverter}}"/>
+                                            <TextBlock Text="{Binding Name}"
+                                                       Foreground="{Binding IsEnabled, Converter={StaticResource BooleanToForegroundConverter}}"/>
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <!-- Content Area -->
+            <Border Grid.Column="1" Background="White">
+                <Frame x:Name="ContentFrame" NavigationUIVisibility="Hidden"/>
+            </Border>
+        </Grid>
+        
+        <!-- Status Bar -->
+        <Border Grid.Row="2" Background="#ecf0f1" BorderBrush="#bdc3c7" BorderThickness="0,1,0,0">
+            <Grid Margin="10,5">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Text="{Binding LoginStatusMessage}" Grid.Column="0"/>
+                <TextBlock Text="v1.0.0" Grid.Column="1" Foreground="#7f8c8d"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
