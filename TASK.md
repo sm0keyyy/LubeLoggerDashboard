@@ -9,7 +9,7 @@
 - [x] Determine specific authentication method required (Basic Auth)
 - [x] Obtain valid API credentials for development
 - [x] Document available endpoints and response formats
-- [x] Set up development environment with .NET 6+ and WPF
+- [x] Set up development environment with .NET 8.0 and WPF
 - [x] Create project structure following MVVM architecture
 - [x] Implement authentication mechanism based on API requirements
 - [x] Create secure credential storage using Windows DPAPI
@@ -152,3 +152,9 @@
 - [x] Removed unnecessary .md files from repository (keeping only README.md, TASK.md, and PLANNING.md)
 - [x] Recreated API_GUIDELINES.md with comprehensive API usage documentation
 - [x] Recreated LubeLoggerDashboard/Docs/DependencyInjection.md with DI system documentation
+- [x] Updated Microsoft.VisualStudio.TestTools.UnitTesting package from version 14.0.0 to 17.8.0 for compatibility with .NET 8.0
+- [x] Fixed IApiClient mock in ApiClientMockFactory.cs by removing the setup for the non-existent GetAuthenticationHeader() method
+- [x] Fixed string formatting issues in ApiClient.cs by changing named parameters to indexed parameters in logging calls
+- [x] Fixed the TestApiClient constructor in ApiClientTests.cs to include the ILoggingService parameter
+- [x] Fixed the CreateApiClient method in ApiClientTests.cs to provide a mock ILoggingService
+- [x] Fixed the SetupMockResponseSequence method in ApiClientTests.cs to properly handle null headers

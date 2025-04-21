@@ -72,7 +72,7 @@ The application will follow the Model-View-ViewModel (MVVM) architecture pattern
 
 ### Primary Technologies
 
-- **Language & Framework**: C# with .NET 6+ and WPF (Windows Presentation Foundation)
+- **Language & Framework**: C# with .NET 8.0 and WPF (Windows Presentation Foundation)
   - Provides native Windows UI capabilities
   - Strong typing and modern language features
   - Extensive ecosystem of libraries
@@ -399,7 +399,7 @@ Example data structures based on the Postman collection:
 - ✅ Investigate LubeLogger API capabilities
 - ✅ Determine authentication method (Basic Auth)
 - ✅ Document available endpoints
-- [x] Set up development environment
+- [x] Set up development environment with .NET 8.0
 - [x] Create project structure
 - [x] Implement authentication mechanism
 
@@ -498,6 +498,22 @@ Example data structures based on the Postman collection:
 
 ### Offline Testing
 - Simulate network interruptions
+- Test caching and offline data access
+
+## Recent Progress
+
+### Compilation Error Fixes
+- Fixed IApiClient mock in ApiClientMockFactory.cs by removing the setup for the non-existent GetAuthenticationHeader() method
+- Fixed string formatting issues in ApiClient.cs by changing named parameters to indexed parameters in logging calls
+- Fixed the TestApiClient constructor in ApiClientTests.cs to include the ILoggingService parameter
+- Fixed the CreateApiClient method in ApiClientTests.cs to provide a mock ILoggingService
+- Fixed the SetupMockResponseSequence method in ApiClientTests.cs to properly handle null headers
+
+### Remaining Issues
+- Need to add missing Serilog packages to the project
+- Need to address remaining interface implementation issues
+- Need to fix namespace and type reference errors
+- Need to address nullability warnings throughout the codebase
 - Verify data integrity during sync
 
 ## Deployment Strategy
@@ -509,7 +525,7 @@ Example data structures based on the Postman collection:
 
 ### System Requirements
 - Windows 10/11
-- .NET 6 runtime
+- .NET 8.0 runtime
 - 4GB RAM minimum
 - 100MB disk space
 

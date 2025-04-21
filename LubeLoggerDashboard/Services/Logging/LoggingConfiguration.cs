@@ -25,7 +25,7 @@ namespace LubeLoggerDashboard.Services.Logging
         /// <summary>
         /// Gets or sets the interval at which to roll log files
         /// </summary>
-        public RollingInterval RollingInterval { get; set; } = RollingInterval.Day;
+        public Serilog.RollingInterval RollingInterval { get; set; } = Serilog.RollingInterval.Day;
 
         /// <summary>
         /// Gets or sets the number of log files to retain

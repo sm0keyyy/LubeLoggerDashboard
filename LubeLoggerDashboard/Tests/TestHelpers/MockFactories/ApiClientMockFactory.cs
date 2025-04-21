@@ -111,13 +111,11 @@ namespace LubeLoggerDashboard.Tests.TestHelpers.MockFactories
             
             mockApiClient.Setup(c => c.RateLimitStatus).Returns(rateLimitInfo);
             
+            // Authentication is handled via SetAuthenticationHeader method, not GetAuthenticationHeader
             if (isAuthenticated)
             {
-                mockApiClient.Setup(c => c.GetAuthenticationHeader()).Returns("Basic dGVzdDp0ZXN0");
-            }
-            else
-            {
-                mockApiClient.Setup(c => c.GetAuthenticationHeader()).Returns((string)null);
+                // Setup authentication-related behavior without using non-existent method
+                mockApiClient.Setup(c => c.IsApiAvailableAsync()).ReturnsAsync(isHealthy);
             }
             
             // Setup IsApiAvailableAsync to return isHealthy

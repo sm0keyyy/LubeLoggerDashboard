@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using LubeLoggerDashboard.Services.Api;
+using LubeLoggerDashboard.Services.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using Moq.Protected;
@@ -61,8 +62,8 @@ namespace LubeLoggerDashboard.Tests.Services.Api
         {
             // Arrange
             SetupMockResponseSequence(
-                (HttpStatusCode.TooManyRequests, "Rate limit exceeded", new[] { new KeyValuePair<string, string>("Retry-After", "1") }),
-                (HttpStatusCode.OK, "Success")
+                (HttpStatusCode.TooManyRequests, "Rate limit exceeded", new KeyValuePair<string, string>[] { new KeyValuePair<string, string>("Retry-After", "1") }),
+                (HttpStatusCode.OK, "Success", null)
             );
             
             var apiClient = CreateApiClient();
@@ -241,12 +242,8 @@ namespace LubeLoggerDashboard.Tests.Services.Api
 
         private ApiClient CreateApiClient()
         {
-            return new ApiClient(_options)
-            {
-                // Use reflection or a test constructor to inject the mock HttpClient
-                // For simplicity, we'll use a test subclass
-                TestHttpClient = _httpClient
-            };
+            var mockLogger = new Mock<ILoggingService>();
+            return new TestApiClient(_httpClient, _options);
         }
 
         private void SetupMockResponse(HttpStatusCode statusCode, string content, KeyValuePair<string, string>[] headers = null)
@@ -340,9 +337,15 @@ namespace LubeLoggerDashboard.Tests.Services.Api
     {
         public HttpClient TestHttpClient { get; set; }
         
-        public TestApiClient(HttpClient httpClient, ApiClientOptions options) : base(options)
+        public TestApiClient(HttpClient httpClient, ApiClientOptions options) : base(CreateMockLoggingService(), options)
         {
             TestHttpClient = httpClient;
+        }
+        
+        private static ILoggingService CreateMockLoggingService()
+        {
+            var mockLogger = new Mock<ILoggingService>();
+            return mockLogger.Object;
         }
         
         // Override the GetVersionedEndpoint method to test versioning

@@ -308,7 +308,7 @@ namespace LubeLoggerDashboard.Services.Api
             }
             catch (Exception ex)
             {
-                _logger.Warning(ex, "Feature detection failed for {FeatureName}", featureName);
+                _logger.Warning(ex, "Feature detection failed for {0}", featureName);
                 _detectedFeatures[featureName] = false;
                 return false;
             }
@@ -328,7 +328,7 @@ namespace LubeLoggerDashboard.Services.Api
             {
                 IsHealthy = await IsApiAvailableAsync(),
                 LastChecked = DateTime.UtcNow,
-                CircuitBreakerStatus = _circuitBreaker.IsOpen ? "Open" : (_circuitBreaker._state == CircuitState.HalfOpen ? "Half-Open" : "Closed"),
+                CircuitBreakerStatus = _circuitBreaker.IsOpen ? "Open" : (_circuitBreaker._state == CircuitBreakerState.CircuitState.HalfOpen ? "Half-Open" : "Closed"),
                 RateLimitInfo = RateLimitStatus
             };
             
@@ -520,13 +520,13 @@ namespace LubeLoggerDashboard.Services.Api
                     
                     if (retryCount >= _options.MaxRetries)
                     {
-                        Log.Error(ex, "Error sending request after {RetryCount} retries", retryCount);
+                        _logger.Error(ex, "Error sending request after {0} retries", retryCount);
                         throw;
                     }
                     
                     retryCount++;
                     var delay = CalculateExponentialBackoff(retryCount);
-                    Log.Warning(ex, "Error sending request. Retrying after {Delay}ms (Attempt {RetryCount}/{MaxRetries})",
+                    _logger.Warning(ex, "Error sending request. Retrying after {0}ms (Attempt {1}/{2})",
                         delay, retryCount, _options.MaxRetries);
                     
                     await Task.Delay(delay);
@@ -583,7 +583,7 @@ namespace LubeLoggerDashboard.Services.Api
                 }
             }
             
-            Log.Debug("Rate limit info updated: Limit={Limit}, Remaining={Remaining}, Reset={Reset}",
+            _logger.Debug("Rate limit info updated: Limit={0}, Remaining={1}, Reset={2}",
                 _rateLimitLimit, _rateLimitRemaining, _rateLimitReset);
         }
         
@@ -741,31 +741,5 @@ namespace LubeLoggerDashboard.Services.Api
     /// <summary>
     /// Detailed health status of the API
     /// </summary>
-    public class ApiHealthStatus
-    {
-        /// <summary>
-        /// Gets or sets a value indicating whether the API is healthy
-        /// </summary>
-        public bool IsHealthy { get; set; }
-        
-        /// <summary>
-        /// Gets or sets the time when the health status was last checked
-        /// </summary>
-        public DateTime LastChecked { get; set; }
-        
-        /// <summary>
-        /// Gets or sets the current circuit breaker status
-        /// </summary>
-        public string CircuitBreakerStatus { get; set; }
-        
-        /// <summary>
-        /// Gets or sets the current rate limit information
-        /// </summary>
-        public RateLimitInfo RateLimitInfo { get; set; }
-        
-        /// <summary>
-        /// Gets or sets additional diagnostic information
-        /// </summary>
-        public Dictionary<string, string> Diagnostics { get; set; } = new Dictionary<string, string>();
-    }
+    // ApiHealthStatus moved to separate file to avoid duplicate definition
 }
