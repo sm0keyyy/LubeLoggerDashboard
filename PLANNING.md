@@ -529,6 +529,48 @@ Example data structures based on the Postman collection:
 - 4GB RAM minimum
 - 100MB disk space
 
+## Code Review Recommendations & Refactoring Plan (Added 2025-04-20 20:51:49)
+
+Based on a recent code review, several critical and high-priority refactoring tasks have been identified to improve the project's structure, stability, and maintainability. These tasks will be prioritized over new feature development in the immediate term.
+
+### Key Recommendations (Prioritized)
+
+1.  **CRITICAL - Refactor Project Structure:**
+    *   **Action:** Separate the solution into distinct projects: `LubeLoggerDashboard.UI` (WPF), `LubeLoggerDashboard.Core` (Models, Interfaces, Helpers), `LubeLoggerDashboard.Infrastructure` (API Client, DB Context, Caching), `LubeLoggerDashboard.Tests`.
+    *   **Rationale:** Fixes fundamental mixing of application/test code, resolves build/test inconsistencies, improves modularity.
+
+2.  **CRITICAL - Standardize Test Framework:**
+    *   **Action:** Choose either MSTest or xUnit for the entire solution. Remove unused framework packages. Ensure `LubeLoggerDashboard.Tests` uses only the chosen framework.
+    *   **Rationale:** Eliminates conflicts, simplifies test execution.
+
+3.  **HIGH - Fix ApiClient Concurrency Bottleneck:**
+    *   **Action:** Remove `SemaphoreSlim(1, 1)` from `ApiClient.cs`. Use `Interlocked` operations if thread safety is needed for counters.
+    *   **Rationale:** Prevents severe performance degradation under concurrent use.
+
+4.  **HIGH - Improve ApiClient Retry Logic:**
+    *   **Action:** Modify retry logic to differentiate transient/non-transient errors. Only retry transient failures. Consider using Polly. Remove redundant `SendWithRetryAsync`.
+    *   **Rationale:** Prevents wasteful retries, improves reliability.
+
+5.  **HIGH - Fix CircuitBreakerState Thread Safety & Encapsulation:**
+    *   **Action:** Use `Interlocked.Increment` for `_failureCount`. Add locking for state transitions if needed. Make `_state` private and expose via a public property. Update `ApiClient.GetDetailedHealthStatusAsync`.
+    *   **Rationale:** Prevents race conditions, ensures correct behavior, adheres to encapsulation.
+
+6.  **MEDIUM - Refactor DI & Configuration:**
+    *   **Action:** Remove static `ServiceLocator`. Rely on constructor injection. Centralize Serilog config. Consolidate duplicate registrations. Register `INavigationService` directly.
+    *   **Rationale:** Improves testability, maintainability, DI best practices.
+
+7.  **MEDIUM - Improve Code Organization:**
+    *   **Action:** Move nested classes (`Credentials`, `RateLimitInfo`, etc.) into separate files.
+    *   **Rationale:** Improves discoverability, adherence to standards.
+
+8.  **LOW - Revisit Database Initialization Error Handling:**
+    *   **Action:** Discuss trade-offs of swallowing errors in `App.xaml.cs`. Consider failing fast or better user feedback.
+    *   **Rationale:** Reduces risk of unexpected runtime failures.
+
+### Impact on Milestones
+
+The critical refactoring tasks (Project Structure, Test Framework) will be inserted before Phase 2 (Vehicle Management). The high-priority fixes (ApiClient, CircuitBreaker) will be addressed concurrently or immediately after the structural refactoring. Medium and low priority items will be integrated into subsequent phases or addressed as time permits. The existing milestones will be adjusted accordingly.
+
 ## Conclusion
 
 This Windows client application will provide a native, responsive interface to LubeLogger data while leveraging the existing backend API. The MVVM architecture ensures separation of concerns, making the application maintainable and testable. The local caching strategy balances performance with data freshness, while providing limited offline capabilities.

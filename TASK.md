@@ -158,3 +158,53 @@
 - [x] Fixed the TestApiClient constructor in ApiClientTests.cs to include the ILoggingService parameter
 - [x] Fixed the CreateApiClient method in ApiClientTests.cs to provide a mock ILoggingService
 - [x] Fixed the SetupMockResponseSequence method in ApiClientTests.cs to properly handle null headers
+---
+
+## Code Review Recommendations (Added 2025-04-20 20:51:25)
+
+These tasks are based on recent code review and should be prioritized.
+
+### CRITICAL
+- [ ] **Refactor Project Structure:**
+    - [ ] Create `LubeLoggerDashboard.UI` project (WPF App).
+    - [ ] Create `LubeLoggerDashboard.Core` project (Models, Service Interfaces, Helpers).
+    - [ ] Create `LubeLoggerDashboard.Infrastructure` project (API Client, DB Context, Caching Impl).
+    - [ ] Create `LubeLoggerDashboard.Tests` project (Test Project).
+    - [ ] Move existing code to the appropriate new projects.
+    - [ ] Update solution file (`.sln`) and project references (`.csproj`).
+- [ ] **Standardize Test Framework:**
+    - [ ] Decide between MSTest and xUnit as the standard framework.
+    - [ ] Remove NuGet packages for the unused test framework from all projects.
+    - [ ] Ensure `LubeLoggerDashboard.Tests` project references only the chosen framework.
+
+### HIGH
+- [ ] **Fix ApiClient Concurrency Bottleneck:**
+    - [ ] Remove `SemaphoreSlim(1, 1)` (`_throttleSemaphore`) from `ApiClient.cs`.
+    - [ ] Use `Interlocked` operations for thread safety if needed for rate limit counters.
+- [ ] **Improve ApiClient Retry Logic:**
+    - [ ] Modify `SendRequestWithRateLimitHandlingAsync` to differentiate transient vs. non-transient errors.
+    - [ ] Implement retry logic only for transient failures.
+    - [ ] Consider using Polly library for robust retry policies.
+    - [ ] Remove the redundant `SendWithRetryAsync` method.
+- [ ] **Fix CircuitBreakerState Thread Safety & Encapsulation:**
+    - [ ] Use `Interlocked.Increment` for `_failureCount` in `CircuitBreakerState`.
+    - [ ] Add locking (`lock`) around state transition logic if necessary.
+    - [ ] Make `_state` field private.
+    - [ ] Expose current state via a public property (e.g., `CurrentState`).
+    - [ ] Update `ApiClient.GetDetailedHealthStatusAsync` to use the new property.
+
+### MEDIUM
+- [ ] **Refactor DI & Configuration:**
+    - [ ] Remove static `ServiceLocator` from `App.xaml.cs`.
+    - [ ] Rely solely on constructor injection throughout the application.
+    - [ ] Centralize and clarify Serilog configuration (e.g., in `App.xaml.cs` using `LoggerConfiguration` or `Serilog.Extensions.Hosting`).
+    - [ ] Inject `IConfigurationService` into `AddLoggingServices`.
+    - [ ] Consolidate duplicate service registrations in `ServiceCollectionExtensions.cs`.
+    - [ ] Register `INavigationService` directly in `ConfigureServices`.
+- [ ] **Improve Code Organization:**
+    - [ ] Move nested classes (`Credentials`, `RateLimitInfo`, `ApiClientOptions`, `CircuitBreakerState`, `CircuitBreakerOpenException`) into their own separate files.
+
+### LOW
+- [ ] **Revisit Database Initialization Error Handling:**
+    - [ ] Discuss trade-offs of swallowing database initialization errors in `App.xaml.cs`.
+    - [ ] Consider failing fast or implementing more explicit user feedback.

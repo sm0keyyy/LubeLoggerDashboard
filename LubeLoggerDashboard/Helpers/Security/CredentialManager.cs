@@ -3,7 +3,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Serilog;
+using LubeLoggerDashboard.Services.Logging; // Added for ILoggingService
 
 namespace LubeLoggerDashboard.Helpers.Security
 {
@@ -14,12 +14,16 @@ namespace LubeLoggerDashboard.Helpers.Security
     {
         private const string CredentialsFileName = "credentials.dat";
         private readonly string _credentialsFilePath;
+        private readonly ILoggingService _logger; // Added logger field
 
         /// <summary>
         /// Initializes a new instance of the CredentialManager class
         /// </summary>
-        public CredentialManager()
+        /// <param name="logger">The logging service.</param> // Added logger parameter doc
+        public CredentialManager(ILoggingService logger) // Added logger parameter
         {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger)); // Assign logger
+
             // Store credentials in the application directory
             var appDataPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -62,12 +66,12 @@ namespace LubeLoggerDashboard.Helpers.Security
 
                 // Write the encrypted data to the file
                 File.WriteAllBytes(_credentialsFilePath, encryptedBytes);
-                
-                Log.Information("Credentials saved successfully for user {Username}", username);
+
+                _logger.Information("Credentials saved successfully for user {Username}", username); // Use injected logger
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Failed to save credentials");
+                _logger.Error(ex, "Failed to save credentials"); // Use injected logger
                 throw;
             }
         }
@@ -79,7 +83,7 @@ namespace LubeLoggerDashboard.Helpers.Security
             {
                 if (!File.Exists(_credentialsFilePath))
                 {
-                    Log.Information("No saved credentials found");
+                    _logger.Information("No saved credentials found"); // Use injected logger
                     return null;
                 }
 
@@ -95,13 +99,13 @@ namespace LubeLoggerDashboard.Helpers.Security
                 // Deserialize the JSON to a Credentials object
                 var json = Encoding.UTF8.GetString(jsonBytes);
                 var credentials = JsonSerializer.Deserialize<Credentials>(json);
-                
-                Log.Information("Credentials retrieved successfully for user {Username}", credentials.Username);
+
+                _logger.Information("Credentials retrieved successfully for user {Username}", credentials.Username); // Use injected logger
                 return credentials;
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Failed to retrieve credentials");
+                _logger.Error(ex, "Failed to retrieve credentials"); // Use injected logger
                 return null;
             }
         }
@@ -114,12 +118,12 @@ namespace LubeLoggerDashboard.Helpers.Security
                 if (File.Exists(_credentialsFilePath))
                 {
                     File.Delete(_credentialsFilePath);
-                    Log.Information("Credentials deleted successfully");
+                    _logger.Information("Credentials deleted successfully"); // Use injected logger
                 }
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Failed to delete credentials");
+                _logger.Error(ex, "Failed to delete credentials"); // Use injected logger
                 throw;
             }
         }
